@@ -99,13 +99,8 @@ jq \
       commitMessage: ($commitMessage | orNull),
       commitAuthor: ($commitAuthor | orNull),
       commitDate: ($commitDate | orNull),
-      parentCommit: (
-        if ($parentCommit | orNull) == null then null
-        else ({
-          commit: ($parentCommit | orNull),
-          date: ($parentDate | orNull)
-        } | with_entries(select(.value != null))) end
-      ),
+      parentCommit: ($parentCommit | orNull),
+      parentCommitDate: ($parentDate | orNull),
       tags: (
         ($tags | split("\n") | map(select(length > 0)))
         | if length == 0 then null else . end

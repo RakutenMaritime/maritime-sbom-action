@@ -68,10 +68,8 @@ jobs:
     "commitMessage": "...",
     "commitAuthor": "Name <email>",
     "commitDate": "2026-07-08T17:08:30+09:00",
-    "parentCommit": {
-      "commit": "0123456789abcdef",
-      "date": "2026-07-08T16:50:00+09:00"
-    },
+    "parentCommit": "0123456789abcdef",
+    "parentCommitDate": "2026-07-08T16:50:00+09:00",
     "tags": ["v1.2.3"],
     "generatedAt": "2026-07-08T08:11:45Z",
     "generator": "cdxgen"

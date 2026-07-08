@@ -137,12 +137,11 @@ if command -v git >/dev/null 2>&1; then
         "$IMAGE" . sbom.json >/tmp/git.log 2>&1
     out="$GITDIR/sbom.json"
     parent_sha="$(git -C "$GITDIR" rev-parse HEAD~1)"
-    if [ "$(jq -r '.metadata.parentCommit.commit' "$out" 2>/dev/null)" = "$parent_sha" ] \
-        && [ "$(jq -r '.metadata.parentCommit.date' "$out" 2>/dev/null)" != "null" ] \
-        && [ "$(jq '.metadata.parentCommit | has("message") or has("author")' "$out" 2>/dev/null)" = "false" ] \
+    if [ "$(jq -r '.metadata.parentCommit' "$out" 2>/dev/null)" = "$parent_sha" ] \
+        && [ "$(jq -r '.metadata.parentCommitDate' "$out" 2>/dev/null)" != "null" ] \
         && [ "$(jq -r '.metadata.commitMessage' "$out" 2>/dev/null)" = "second commit" ] \
         && [ "$(jq -r '.metadata.tags[0]' "$out" 2>/dev/null)" = "v9.9.9" ]; then
-        pass "resolves parentCommit (hash+date only) and tag from git"
+        pass "resolves parentCommit (hash) + parentCommitDate and tag from git"
     else
         fail "git parentCommit/tag resolution wrong"; jq '.metadata' "$out" 2>/dev/null; cat /tmp/git.log
     fi

@@ -7,26 +7,38 @@ on:
   workflow_dispatch:
 
 jobs:
-  integration:
-    name: Integration tests
+  generate-tests:
+    name: generate action tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Run generate test suite
+        run: generate/tests/run-tests.sh
 
-      - name: Run SBOM action test suite
-        run: tests/run-tests.sh
+  upload-tests:
+    name: upload action tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run upload test suite
+        run: upload/tests/run-tests.sh
 
   self-test:
-    name: Self-test action on this repo
+    name: Self-test actions on this repo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate SBOM via this action
+      - name: Generate SBOM
         id: sbom
-        uses: ./
+        uses: ./generate
         with:
           output-file: sbom.json
+
+      - name: Upload SBOM
+        uses: ./upload
+        with:
+          sbom-file: ${{ steps.sbom.outputs.sbom-file }}
           api-url: ''   # skip upload in CI self-test
 
       - name: Upload SBOM artifact

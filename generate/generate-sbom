@@ -36,12 +36,14 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     repo="$(jq -r '.metadata.repository // "-"' "$OUTPUT_FILE")"
     commit="$(jq -r '.metadata.commit // "-"' "$OUTPUT_FILE")"
     branch="$(jq -r '.metadata.branch // "-"' "$OUTPUT_FILE")"
+    tags="$(jq -r '(.metadata.tags // []) | join(", ")' "$OUTPUT_FILE")"
     {
         echo "### 📦 SBOM (\`${OUTPUT_FILE}\`)"
         echo
         echo "- **Repository:** ${repo}"
         echo "- **Branch:** ${branch}"
         echo "- **Commit:** ${commit}"
+        [ -n "$tags" ] && echo "- **Tags:** ${tags}"
         echo "- **Components:** ${component_count}"
         echo
         echo "| Name | Version | Type | purl |"

@@ -34,6 +34,11 @@ BRANCH="${GITHUB_REF_NAME:-}"
 COMMIT_MESSAGE=""
 COMMIT_AUTHOR=""
 COMMIT_DATE=""
+PARENT_COMMIT=""
+PARENT_MESSAGE=""
+PARENT_AUTHOR=""
+PARENT_DATE=""
+TAGS=""
 
 if command -v git >/dev/null 2>&1 && git -C "$SCAN_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     # Avoid "dubious ownership" errors on the mounted workspace.
@@ -48,6 +53,22 @@ if command -v git >/dev/null 2>&1 && git -C "$SCAN_PATH" rev-parse --is-inside-w
         # Normalize git@host:owner/repo.git or https://host/owner/repo.git -> owner/repo
         REPO="$(printf '%s' "$origin" | sed -E 's#(git@|https?://)[^/:]+[/:]##; s#\.git$##')"
     fi
+
+    # Parent (previous) commit, when history is available (needs fetch-depth: 0).
+    PARENT_COMMIT="$(git -C "$SCAN_PATH" rev-parse --verify -q HEAD~1 2>/dev/null || true)"
+    if [ -n "$PARENT_COMMIT" ]; then
+        PARENT_MESSAGE="$(git -C "$SCAN_PATH" log -1 --pretty=%s "$PARENT_COMMIT" 2>/dev/null || true)"
+        PARENT_AUTHOR="$(git -C "$SCAN_PATH" log -1 --pretty='%an <%ae>' "$PARENT_COMMIT" 2>/dev/null || true)"
+        PARENT_DATE="$(git -C "$SCAN_PATH" log -1 --pretty=%cI "$PARENT_COMMIT" 2>/dev/null || true)"
+    fi
+
+    # Tags pointing at the current commit (newline-separated).
+    TAGS="$(git -C "$SCAN_PATH" tag --points-at HEAD 2>/dev/null || true)"
+fi
+
+# When triggered by a tag push, use the ref as the tag even without full git.
+if [ -z "$TAGS" ] && [ "${GITHUB_REF:-}" != "${GITHUB_REF#refs/tags/}" ]; then
+    TAGS="${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}"
 fi
 
 REPO_URL=""
@@ -66,6 +87,11 @@ jq \
   --arg commitMessage "$COMMIT_MESSAGE" \
   --arg commitAuthor "$COMMIT_AUTHOR" \
   --arg commitDate "$COMMIT_DATE" \
+  --arg parentCommit "$PARENT_COMMIT" \
+  --arg parentMessage "$PARENT_MESSAGE" \
+  --arg parentAuthor "$PARENT_AUTHOR" \
+  --arg parentDate "$PARENT_DATE" \
+  --arg tags "$TAGS" \
   --arg generatedAt "$GENERATED_AT" \
   '
   def orNull: if . == "" then null else . end;
@@ -79,6 +105,19 @@ jq \
       commitMessage: ($commitMessage | orNull),
       commitAuthor: ($commitAuthor | orNull),
       commitDate: ($commitDate | orNull),
+      parentCommit: (
+        if ($parentCommit | orNull) == null then null
+        else ({
+          commit: ($parentCommit | orNull),
+          message: ($parentMessage | orNull),
+          author: ($parentAuthor | orNull),
+          date: ($parentDate | orNull)
+        } | with_entries(select(.value != null))) end
+      ),
+      tags: (
+        ($tags | split("\n") | map(select(length > 0)))
+        | if length == 0 then null else . end
+      ),
       generatedAt: $generatedAt,
       generator: "cdxgen"
     } | with_entries(select(.value != null))),

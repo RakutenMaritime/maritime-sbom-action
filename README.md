@@ -68,6 +68,13 @@ jobs:
     "commitMessage": "...",
     "commitAuthor": "Name <email>",
     "commitDate": "2026-07-08T17:08:30+09:00",
+    "parentCommit": {
+      "commit": "0123456789abcdef",
+      "message": "...",
+      "author": "Name <email>",
+      "date": "2026-07-08T16:50:00+09:00"
+    },
+    "tags": ["v1.2.3"],
     "generatedAt": "2026-07-08T08:11:45Z",
     "generator": "cdxgen"
   },
@@ -81,8 +88,12 @@ jobs:
 `metadata`는 **이 액션을 실행하는 (분석 대상) 저장소**의 정보입니다. 액션 자신의
 저장소가 아니라, 워크플로우가 돌아가는 소비자 repo의 `GITHUB_REPOSITORY`/`GITHUB_SHA`
 등을 사용하며 (없으면 scan 경로의 git으로 폴백), 이 정보는 SBOM에 포함되어 **upload
-시 API로 함께 전송**됩니다. 값이 없는 메타 필드(예: git 정보가 없을 때의
-`commitMessage`/`commitAuthor`/`commitDate`)는 출력에서 생략됩니다.
+시 API로 함께 전송**됩니다. `parentCommit`(직전 부모 커밋)과 `tags`(현재 커밋에
+달린 태그)도 포함됩니다. 값이 없는 메타 필드는 출력에서 생략됩니다.
+
+> `parentCommit`은 git 히스토리가 있어야 채워집니다. GitHub Actions 기본
+> `actions/checkout`은 `fetch-depth: 1`(HEAD만)이므로, 부모 커밋 정보가 필요하면
+> 소비자 워크플로우에서 `fetch-depth: 0`으로 체크아웃하세요.
 
 | Input | Description | Default |
 |-------|-------------|---------|

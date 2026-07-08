@@ -101,6 +101,53 @@ else
 fi
 rm -rf "$WORKDIR"
 
+# ---- Test: tag captured from a tag-triggered ref (no git) ----------------
+echo "▶ Tag captured from refs/tags ref"
+WORKDIR="$(mktemp -d)"; cp -R "$FIXTURE/." "$WORKDIR/"
+docker run --rm --platform "$PLATFORM" \
+    -e GITHUB_REPOSITORY=your-org/your-app \
+    -e GITHUB_SHA=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef \
+    -e GITHUB_REF=refs/tags/v9.9.9 \
+    -e GITHUB_REF_NAME=v9.9.9 \
+    -v "$WORKDIR:/github/workspace" \
+    "$IMAGE" . sbom.json >/tmp/tag.log 2>&1
+out="$WORKDIR/sbom.json"
+if [ "$(jq -r '.metadata.tags[0]' "$out" 2>/dev/null)" = "v9.9.9" ] \
+    && [ "$(jq '.metadata | has("parentCommit")' "$out" 2>/dev/null)" = "false" ]; then
+    pass "captures tag from ref; omits parentCommit without git history"
+else
+    fail "tag/parentCommit handling wrong"; jq '.metadata' "$out" 2>/dev/null; cat /tmp/tag.log
+fi
+rm -rf "$WORKDIR"
+
+# ---- Test: parent commit + tag resolved from git -------------------------
+if command -v git >/dev/null 2>&1; then
+    echo "▶ Parent commit and tag from git history"
+    GITDIR="$(mktemp -d)"
+    cp -R "$FIXTURE/." "$GITDIR/"
+    git -C "$GITDIR" init -q
+    git -C "$GITDIR" -c user.email=t@example.com -c user.name=tester add -A
+    git -C "$GITDIR" -c user.email=t@example.com -c user.name=tester commit -qm "first commit"
+    : > "$GITDIR/CHANGELOG.md"
+    git -C "$GITDIR" -c user.email=t@example.com -c user.name=tester add -A
+    git -C "$GITDIR" -c user.email=t@example.com -c user.name=tester commit -qm "second commit"
+    git -C "$GITDIR" tag v9.9.9
+    docker run --rm --platform "$PLATFORM" \
+        -v "$GITDIR:/github/workspace" \
+        "$IMAGE" . sbom.json >/tmp/git.log 2>&1
+    out="$GITDIR/sbom.json"
+    if [ "$(jq -r '.metadata.parentCommit.message' "$out" 2>/dev/null)" = "first commit" ] \
+        && [ "$(jq -r '.metadata.commitMessage' "$out" 2>/dev/null)" = "second commit" ] \
+        && [ "$(jq -r '.metadata.tags[0]' "$out" 2>/dev/null)" = "v9.9.9" ]; then
+        pass "resolves parentCommit and tag from git"
+    else
+        fail "git parentCommit/tag resolution wrong"; jq '.metadata' "$out" 2>/dev/null; cat /tmp/git.log
+    fi
+    rm -rf "$GITDIR"
+else
+    echo "⏭  Skipping git parentCommit test (git not found)"
+fi
+
 # ---- Test: missing scan path fails ---------------------------------------
 echo "▶ Missing scan path is rejected"
 if run_generate sbom.json ./does-not-exist >/tmp/missing.log 2>&1; then

@@ -6,30 +6,35 @@ SCAN_PATH="${1:-.}"
 FORMAT="${2:-spdx}"
 OUTPUT_FILE="${3:-sbom.json}"
 
-# Check if scan path exists
-if [ ! -d "$SCAN_PATH" ]; then
-    echo "❌ Scan path does not exist: $SCAN_PATH"
-    exit 1
-fi
+# Main execution logic
+main() {
+    local scan_path=$1
+    local format=$2
+    local output_file=$3
 
-echo "📦 Analyzing dependencies in $SCAN_PATH..."
-
-case "$FORMAT" in
-    spdx)
-        # Generate SPDX format SBOM
-        generate_spdx_sbom "$SCAN_PATH" "$OUTPUT_FILE"
-        ;;
-    cyclonedx)
-        # Generate CycloneDX format SBOM
-        generate_cyclonedx_sbom "$SCAN_PATH" "$OUTPUT_FILE"
-        ;;
-    *)
-        echo "❌ Unsupported format: $FORMAT"
-        echo "  Supported formats: spdx, cyclonedx"
+    # Check if scan path exists
+    if [ ! -d "$scan_path" ]; then
+        echo "❌ Scan path does not exist: $scan_path"
         exit 1
-        ;;
-esac
+    fi
 
+    echo "📦 Analyzing dependencies in $scan_path..."
+
+    case "$format" in
+        spdx)
+            # Generate SPDX format SBOM
+            generate_spdx_sbom "$scan_path" "$output_file"
+            ;;
+        cyclonedx)
+            # Generate CycloneDX format SBOM
+            generate_cyclonedx_sbom "$scan_path" "$output_file"
+            ;;
+        *)
+            echo "❌ Unsupported format: $format"
+            echo "  Supported formats: spdx, cyclonedx"
+            exit 1
+            ;;
+    esac
 }
 
 # Function to generate SPDX format SBOM
@@ -37,7 +42,7 @@ generate_spdx_sbom() {
     local scan_path=$1
     local output_file=$2
     
-    cat > "$output_file" <<'EOF'
+    cat > "$output_file" <<EOF
 {
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
@@ -58,7 +63,7 @@ generate_cyclonedx_sbom() {
     local scan_path=$1
     local output_file=$2
     
-    cat > "$output_file" <<'EOF'
+    cat > "$output_file" <<EOF
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.4",

@@ -11,7 +11,7 @@ jobs:
     name: generate action tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run generate test suite
         run: generate/tests/run-tests.sh
 
@@ -19,7 +19,7 @@ jobs:
     name: upload action tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run upload test suite
         run: upload/tests/run-tests.sh
 
@@ -27,7 +27,7 @@ jobs:
     name: Self-test actions on this repo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Generate SBOM
         id: sbom

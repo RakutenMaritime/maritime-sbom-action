@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run SBOM action test suite
+        run: tests/run-tests.sh
+
+  self-test:
+    name: Self-test action on this repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM via this action
+        id: sbom
+        uses: ./
+        with:
+          format: cyclonedx
+          output-file: sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: ${{ steps.sbom.outputs.sbom-file }}

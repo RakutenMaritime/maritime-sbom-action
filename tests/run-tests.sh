@@ -83,25 +83,9 @@ else
 fi
 rm -rf "$WORKDIR"
 
-# ---- Test: SPDX -----------------------------------------------------------
-echo "▶ SPDX generation"
-if run_action spdx sbom.spdx.json >/tmp/spdx.log 2>&1; then
-    out="$WORKDIR/sbom.spdx.json"
-    if [ -f "$out" ] \
-        && [[ "$(jq -r '.spdxVersion' "$out")" == SPDX-* ]] \
-        && [ "$(jq '.packages | length' "$out")" -ge 1 ]; then
-        pass "spdx SBOM has spdxVersion and at least one package"
-    else
-        fail "spdx SBOM missing expected content"; cat /tmp/spdx.log
-    fi
-else
-    fail "spdx run exited non-zero"; cat /tmp/spdx.log
-fi
-rm -rf "$WORKDIR"
-
 # ---- Test: unsupported format fails --------------------------------------
 echo "▶ Unsupported format is rejected"
-if run_action bogus sbom.json >/tmp/bad.log 2>&1; then
+if run_action spdx sbom.json >/tmp/bad.log 2>&1; then
     fail "unsupported format should exit non-zero"
 else
     grep -qi "Unsupported format" /tmp/bad.log \

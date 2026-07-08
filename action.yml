@@ -4,7 +4,7 @@ author: 'Rakuten Symphony'
 
 inputs:
   format:
-    description: 'SBOM format (spdx, cyclonedx)'
+    description: 'SBOM format (cyclonedx)'
     required: false
     default: 'cyclonedx'
   output-file:

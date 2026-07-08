@@ -27,7 +27,7 @@ jobs:
 - name: Generate SBOM with Options
   uses: RakutenMaritime/maritime-sbom-action
   with:
-    format: 'cyclonedx'          # spdx or cyclonedx (default: spdx)
+    format: 'cyclonedx'          # cyclonedx (default: cyclonedx)
     scan-path: './src'           # 스캔 경로 (default: .)
     output-file: 'sbom.json'     # 출력 파일 경로 (default: sbom.json)
 ```
@@ -36,7 +36,7 @@ jobs:
 
 | Input | Description | Default | Required |
 |-------|-------------|---------|----------|
-| `format` | SBOM 형식 (spdx, cyclonedx) | `spdx` | false |
+| `format` | SBOM 형식 (cyclonedx) | `cyclonedx` | false |
 | `output-file` | 출력 파일 경로 | `sbom.json` | false |
 | `scan-path` | 스캔할 경로 | `.` | false |
 
@@ -80,7 +80,7 @@ jobs:
 chmod +x generate-sbom scripts/sbom-generator.sh
 
 # 스크립트 실행
-./generate-sbom ./test-dir spdx output.json
+./generate-sbom ./test-dir cyclonedx output.json
 ```
 
 ### Dockerfile 빌드

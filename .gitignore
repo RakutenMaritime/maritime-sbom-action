@@ -20,3 +20,5 @@ sbom.xml
 # OS
 .env.local
 .env.*.local
+
+.claude/

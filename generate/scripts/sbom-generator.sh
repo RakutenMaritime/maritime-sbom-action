@@ -71,6 +71,9 @@ REPO_URL=""
 [ -n "$REPO" ] && REPO_URL="${SERVER_URL%/}/$REPO"
 GENERATED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
+# The ref this action was invoked at (e.g. v1.6), provided by GitHub Actions.
+ACTION_VERSION="${GITHUB_ACTION_REF:-}"
+
 # Flatten the CycloneDX document into a plain JSON dependency list and attach
 # the source metadata.
 echo "🔄 Converting to a plain JSON dependency list..."
@@ -86,6 +89,7 @@ jq \
   --arg parentCommit "$PARENT_COMMIT" \
   --arg parentDate "$PARENT_DATE" \
   --arg tags "$TAGS" \
+  --arg actionVersion "$ACTION_VERSION" \
   --arg generatedAt "$GENERATED_AT" \
   '
   def orNull: if . == "" then null else . end;
@@ -106,7 +110,8 @@ jq \
         | if length == 0 then null else . end
       ),
       generatedAt: $generatedAt,
-      generator: "cdxgen"
+      generator: "cdxgen",
+      actionVersion: ($actionVersion | orNull)
     } | with_entries(select(.value != null))),
     componentCount: ((.components // []) | length),
     components: [

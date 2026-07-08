@@ -44,6 +44,7 @@ run_generate() {
         -e GITHUB_SHA=abcdef1234567890abcdef1234567890abcdef12 \
         -e GITHUB_REF=refs/heads/main \
         -e GITHUB_REF_NAME=main \
+        -e GITHUB_ACTION_REF=v1.6 \
         -v "$WORKDIR:/github/workspace" \
         "$IMAGE" "$scan_path" "$output"
 }
@@ -85,8 +86,9 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     if [ "$(jq -r '.metadata.repository' "$out")" = "RakutenMaritime/maritime-sbom-action" ] \
         && [ "$(jq -r '.metadata.commit' "$out")" = "abcdef1234567890abcdef1234567890abcdef12" ] \
         && [ "$(jq -r '.metadata.repositoryUrl' "$out")" = "https://github.com/RakutenMaritime/maritime-sbom-action" ] \
-        && [ "$(jq -r '.metadata.branch' "$out")" = "main" ]; then
-        pass "embeds source metadata (repository/commit/branch)"
+        && [ "$(jq -r '.metadata.branch' "$out")" = "main" ] \
+        && [ "$(jq -r '.metadata.actionVersion' "$out")" = "v1.6" ]; then
+        pass "embeds source metadata (repository/commit/branch/actionVersion)"
     else
         fail "source metadata missing/incorrect"; jq '.metadata' "$out" 2>/dev/null
     fi

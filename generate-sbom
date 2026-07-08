@@ -27,9 +27,16 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
 fi
 
 # Optionally upload the SBOM to an API endpoint via HTTP POST.
-# Enabled when API_URL is provided (mapped from the api-url input); API_KEY
-# (from the api-key input) is sent as the X-Api-Key header when present.
-if [ -n "${API_URL:-}" ]; then
+# Enabled only when API_URL is a non-empty value (mapped from the api-url
+# input); API_KEY (from the api-key input) is sent as the X-Api-Key header when
+# present. Surrounding whitespace is trimmed so a blank api-url disables upload.
+API_URL="${API_URL:-}"
+API_URL="${API_URL#"${API_URL%%[![:space:]]*}"}"   # strip leading whitespace
+API_URL="${API_URL%"${API_URL##*[![:space:]]}"}"   # strip trailing whitespace
+
+if [ -z "$API_URL" ]; then
+    echo "ℹ️  api-url is empty; skipping API upload."
+else
     echo "📡 Uploading SBOM to $API_URL ..."
 
     auth_args=()

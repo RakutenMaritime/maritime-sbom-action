@@ -94,6 +94,20 @@ else
 fi
 rm -rf "$WORKDIR"
 
+# ---- Test: empty api-url skips upload ------------------------------------
+echo "▶ Empty api-url skips upload"
+if run_action sbom.json >/tmp/noupload.log 2>&1; then
+    if grep -qi "skipping API upload" /tmp/noupload.log \
+        && ! grep -qi "Uploading SBOM" /tmp/noupload.log; then
+        pass "empty api-url skips upload and still succeeds"
+    else
+        fail "empty api-url did not skip upload"; cat /tmp/noupload.log
+    fi
+else
+    fail "run with empty api-url exited non-zero"; cat /tmp/noupload.log
+fi
+rm -rf "$WORKDIR"
+
 # ---- Test: API upload -----------------------------------------------------
 # Spin up a one-shot mock HTTP server on the host and point the action at it
 # via host.docker.internal, asserting the plain-JSON body and X-Api-Key header

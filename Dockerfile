@@ -5,8 +5,9 @@ LABEL maintainer="Rakuten Symphony"
 # Version pins
 ARG CDXGEN_VERSION=11.4.3
 
-# Install runtime dependencies and cdxgen (CycloneDX SBOM generator).
-RUN apk add --no-cache bash git \
+# Install runtime dependencies (curl is used to upload the SBOM to an API)
+# and cdxgen (CycloneDX SBOM generator).
+RUN apk add --no-cache bash git curl \
     && npm install -g @cyclonedx/cdxgen@${CDXGEN_VERSION}
 
 # Copy scripts to container

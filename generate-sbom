@@ -4,7 +4,7 @@ set -e
 
 # Script behavior
 SCAN_PATH="${1:-.}"
-FORMAT="${2:-spdx}"
+FORMAT="${2:-cyclonedx}"
 OUTPUT_FILE="${3:-sbom.json}"
 
 echo "🔍 Starting SBOM generation..."
@@ -15,13 +15,50 @@ echo "  Output File: $OUTPUT_FILE"
 # Call the SBOM generator script
 /opt/sbom/scripts/sbom-generator.sh "$SCAN_PATH" "$FORMAT" "$OUTPUT_FILE"
 
-if [ -f "$OUTPUT_FILE" ]; then
-    echo "✅ SBOM generated successfully"
-    echo "📄 Output: $OUTPUT_FILE"
-    
-    # Set output variable for GitHub Actions
-    echo "sbom-file=$OUTPUT_FILE" >> "$GITHUB_OUTPUT"
-else
+if [ ! -f "$OUTPUT_FILE" ]; then
     echo "❌ Failed to generate SBOM"
     exit 1
+fi
+
+echo "✅ SBOM generated successfully"
+echo "📄 Output: $OUTPUT_FILE"
+
+# Set output variable for GitHub Actions
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "sbom-file=$OUTPUT_FILE" >> "$GITHUB_OUTPUT"
+fi
+
+# Optionally upload the SBOM to an API endpoint via HTTP POST.
+# Enabled when API_URL is provided (mapped from the api-url input); API_KEY
+# (from the api-key input) is sent as the X-Api-Key header when present.
+if [ -n "${API_URL:-}" ]; then
+    echo "📡 Uploading SBOM to $API_URL ..."
+
+    auth_args=()
+    if [ -n "${API_KEY:-}" ]; then
+        auth_args=(-H "X-Api-Key: ${API_KEY}")
+    fi
+
+    response_body="$(mktemp)"
+    http_code="$(curl -sS -X POST \
+        -H "Content-Type: application/json" \
+        "${auth_args[@]}" \
+        --data-binary "@${OUTPUT_FILE}" \
+        -o "$response_body" \
+        -w '%{http_code}' \
+        "$API_URL")" || {
+            echo "❌ SBOM upload failed (could not reach $API_URL)"
+            rm -f "$response_body"
+            exit 1
+        }
+
+    if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+        echo "✅ SBOM uploaded successfully (HTTP $http_code)"
+    else
+        echo "❌ SBOM upload failed (HTTP $http_code)"
+        cat "$response_body"
+        rm -f "$response_body"
+        exit 1
+    fi
+    rm -f "$response_body"
 fi

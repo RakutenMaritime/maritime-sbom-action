@@ -105,6 +105,67 @@ else
 fi
 rm -rf "$WORKDIR"
 
+# ---- Test: API upload -----------------------------------------------------
+# Spin up a one-shot mock HTTP server on the host and point the action at it
+# via host.docker.internal, asserting the SBOM body and X-Api-Key header are
+# received, and that a 5xx response makes the action fail.
+run_upload() {
+    # run_upload <mock-status> <api-key> -> exports PORT/BODY/HDR, runs action,
+    # sets UPLOAD_RC to the action exit code.
+    local mock_status=$1 api_key=$2
+    BODY="$(mktemp)"; HDR="$(mktemp)"; local portfile; portfile="$(mktemp)"
+    python3 "$REPO_ROOT/tests/mock-api-server.py" "$BODY" "$HDR" "$mock_status" >"$portfile" 2>/dev/null &
+    local mock_pid=$!
+    PORT=""
+    for _ in $(seq 1 25); do PORT="$(cat "$portfile" 2>/dev/null)"; [ -n "$PORT" ] && break; sleep 0.2; done
+    rm -f "$portfile"
+    if [ -z "$PORT" ]; then UPLOAD_RC=99; kill "$mock_pid" 2>/dev/null; return; fi
+
+    WORKDIR="$(mktemp -d)"; cp -R "$FIXTURE/." "$WORKDIR/"; : > "$WORKDIR/gh_output"
+    docker run --rm --platform "$PLATFORM" \
+        --add-host=host.docker.internal:host-gateway \
+        -e GITHUB_OUTPUT=/github/workspace/gh_output \
+        -e API_URL="http://host.docker.internal:$PORT" \
+        -e API_KEY="$api_key" \
+        -v "$WORKDIR:/github/workspace" \
+        "$IMAGE" . cyclonedx sbom.json >/tmp/upload.log 2>&1
+    UPLOAD_RC=$?
+    wait "$mock_pid" 2>/dev/null
+    rm -rf "$WORKDIR"
+}
+
+if command -v python3 >/dev/null 2>&1; then
+    echo "▶ Upload SBOM to API (success)"
+    run_upload 200 "test-key-123"
+    if [ "$UPLOAD_RC" -eq 0 ]; then
+        pass "action succeeds when upload returns 2xx"
+    else
+        fail "action failed on successful upload (rc=$UPLOAD_RC)"; cat /tmp/upload.log
+    fi
+    if [ "$(jq -r '.bomFormat' "$BODY" 2>/dev/null)" = "CycloneDX" ]; then
+        pass "API received the CycloneDX SBOM as the POST body"
+    else
+        fail "API did not receive the expected SBOM body"
+    fi
+    if head -n1 "$HDR" 2>/dev/null | grep -q "test-key-123"; then
+        pass "API received the X-Api-Key header"
+    else
+        fail "API did not receive the X-Api-Key header"
+    fi
+    rm -f "$BODY" "$HDR"
+
+    echo "▶ Upload failure (5xx) makes the action fail"
+    run_upload 500 "test-key-123"
+    if [ "$UPLOAD_RC" -ne 0 ] && [ "$UPLOAD_RC" -ne 99 ]; then
+        pass "action exits non-zero when upload returns 5xx"
+    else
+        fail "action did not fail on 5xx upload (rc=$UPLOAD_RC)"; cat /tmp/upload.log
+    fi
+    rm -f "$BODY" "$HDR"
+else
+    echo "⏭  Skipping API upload tests (python3 not found)"
+fi
+
 # ---- Summary --------------------------------------------------------------
 echo "=========================================="
 echo " Results: $PASS passed, $FAIL failed"

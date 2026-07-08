@@ -32,6 +32,21 @@ jobs:
     output-file: 'sbom.json'     # 출력 파일 경로 (default: sbom.json)
 ```
 
+### API로 SBOM 전송
+
+`api-url`을 지정하면 생성된 SBOM을 해당 URL로 HTTP `POST` 전송합니다.
+`api-key`를 함께 지정하면 `X-Api-Key` 헤더로 전송됩니다. 응답이 2xx가 아니면
+스텝이 실패합니다.
+
+```yaml
+- name: Generate & upload SBOM
+  uses: RakutenMaritime/maritime-sbom-action
+  with:
+    format: 'cyclonedx'
+    api-url: 'https://sbom.example.com/api/v1/bom'
+    api-key: ${{ secrets.SBOM_API_KEY }}   # X-Api-Key 헤더로 전송
+```
+
 ## 📋 Inputs
 
 | Input | Description | Default | Required |
@@ -39,6 +54,8 @@ jobs:
 | `format` | SBOM 형식 (cyclonedx) | `cyclonedx` | false |
 | `output-file` | 출력 파일 경로 | `sbom.json` | false |
 | `scan-path` | 스캔할 경로 | `.` | false |
+| `api-url` | 지정 시 생성된 SBOM을 이 URL로 POST 전송 | `''` | false |
+| `api-key` | 업로드 시 `X-Api-Key` 헤더로 전송할 API 키 | `''` | false |
 
 ## 📤 Outputs
 

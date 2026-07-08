@@ -1,5 +1,5 @@
 name: 'Rakuten SBOM Action'
-description: 'Generate Software Bill of Materials (SBOM) for your project'
+description: 'Generate a Software Bill of Materials (SBOM) with cdxgen and optionally upload it to an API'
 author: 'Rakuten Symphony'
 
 inputs:
@@ -15,6 +15,14 @@ inputs:
     description: 'Path to scan for dependencies'
     required: false
     default: '.'
+  api-url:
+    description: 'If set, POST the generated SBOM to this URL'
+    required: false
+    default: ''
+  api-key:
+    description: 'API key sent as the X-Api-Key header when uploading to api-url'
+    required: false
+    default: ''
 
 outputs:
   sbom-file:
@@ -27,3 +35,6 @@ runs:
     - ${{ inputs.scan-path }}
     - ${{ inputs.format }}
     - ${{ inputs.output-file }}
+  env:
+    API_URL: ${{ inputs.api-url }}
+    API_KEY: ${{ inputs.api-key }}

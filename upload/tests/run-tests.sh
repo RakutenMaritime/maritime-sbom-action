@@ -24,10 +24,10 @@ require() {
 require curl
 require python3
 
-# A small sample SBOM to upload.
+# A small sample SBOM to upload (includes source metadata).
 SAMPLE="$(mktemp)"
 cat > "$SAMPLE" <<'EOF'
-{"componentCount":1,"components":[{"name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21","type":"library","group":""}]}
+{"metadata":{"repository":"RakutenMaritime/maritime-sbom-action","commit":"abcdef1234567890","branch":"main","generator":"cdxgen"},"componentCount":1,"components":[{"name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21","type":"library","group":""}]}
 EOF
 
 # run_upload <mock-status> <api-key> <sbom-file> -> sets BODY/HDR/UPLOAD_RC.
@@ -97,6 +97,12 @@ if [ "$(jq -r '.components[0].purl' "$BODY" 2>/dev/null)" = "pkg:npm/lodash@4.17
     pass "API received the SBOM as the POST body"
 else
     fail "API did not receive the expected SBOM body"
+fi
+if [ "$(jq -r '.metadata.repository' "$BODY" 2>/dev/null)" = "RakutenMaritime/maritime-sbom-action" ] \
+    && [ "$(jq -r '.metadata.commit' "$BODY" 2>/dev/null)" = "abcdef1234567890" ]; then
+    pass "API received the source metadata (repository/commit)"
+else
+    fail "API did not receive the source metadata"
 fi
 if head -n1 "$HDR" 2>/dev/null | grep -q "test-key-123"; then
     pass "API received the X-Api-Key header"

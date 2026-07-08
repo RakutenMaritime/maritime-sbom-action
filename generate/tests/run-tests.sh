@@ -40,6 +40,10 @@ run_generate() {
     docker run --rm --platform "$PLATFORM" \
         -e GITHUB_OUTPUT=/github/workspace/gh_output \
         -e GITHUB_STEP_SUMMARY=/github/workspace/step_summary.md \
+        -e GITHUB_REPOSITORY=RakutenMaritime/maritime-sbom-action \
+        -e GITHUB_SHA=abcdef1234567890abcdef1234567890abcdef12 \
+        -e GITHUB_REF=refs/heads/main \
+        -e GITHUB_REF_NAME=main \
         -v "$WORKDIR:/github/workspace" \
         "$IMAGE" "$scan_path" "$output"
 }
@@ -78,6 +82,14 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     grep -q "pkg:npm/lodash@4.17.21" "$WORKDIR/step_summary.md" \
         && pass "writes component table to job summary" \
         || fail "did not write job summary"
+    if [ "$(jq -r '.metadata.repository' "$out")" = "RakutenMaritime/maritime-sbom-action" ] \
+        && [ "$(jq -r '.metadata.commit' "$out")" = "abcdef1234567890abcdef1234567890abcdef12" ] \
+        && [ "$(jq -r '.metadata.repositoryUrl' "$out")" = "https://github.com/RakutenMaritime/maritime-sbom-action" ] \
+        && [ "$(jq -r '.metadata.branch' "$out")" = "main" ]; then
+        pass "embeds source metadata (repository/commit/branch)"
+    else
+        fail "source metadata missing/incorrect"; jq '.metadata' "$out" 2>/dev/null
+    fi
 else
     fail "generation run exited non-zero"; cat /tmp/gen.log
 fi

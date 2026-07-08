@@ -59,12 +59,27 @@ jobs:
 
 ```json
 {
+  "metadata": {
+    "repository": "RakutenMaritime/maritime-sbom-action",
+    "repositoryUrl": "https://github.com/RakutenMaritime/maritime-sbom-action",
+    "ref": "refs/heads/main",
+    "branch": "main",
+    "commit": "abcdef1234567890",
+    "commitMessage": "...",
+    "commitAuthor": "Name <email>",
+    "commitDate": "2026-07-08T17:08:30+09:00",
+    "generatedAt": "2026-07-08T08:11:45Z",
+    "generator": "cdxgen"
+  },
   "componentCount": 1,
   "components": [
     { "name": "lodash", "version": "4.17.21", "purl": "pkg:npm/lodash@4.17.21", "type": "library", "group": "" }
   ]
 }
 ```
+
+`metadata`에는 분석 대상 소스의 저장소·커밋 정보가 담기며 (GitHub Actions 환경변수
+우선, 없으면 git으로 폴백), 이 정보는 SBOM에 포함되어 **upload 시 API로 함께 전송**됩니다.
 
 | Input | Description | Default |
 |-------|-------------|---------|

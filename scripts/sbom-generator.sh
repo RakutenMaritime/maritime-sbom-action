@@ -3,7 +3,7 @@
 set -e
 
 SCAN_PATH="${1:-.}"
-FORMAT="${2:-spdx}"
+FORMAT="${2:-cyclonedx}"
 OUTPUT_FILE="${3:-sbom.json}"
 
 # Main execution logic
@@ -18,69 +18,66 @@ main() {
         exit 1
     fi
 
-    echo "📦 Analyzing dependencies in $scan_path..."
+    echo "📦 Analyzing dependencies in $scan_path with cdxgen..."
 
     case "$format" in
-        spdx)
-            # Generate SPDX format SBOM
-            generate_spdx_sbom "$scan_path" "$output_file"
-            ;;
         cyclonedx)
-            # Generate CycloneDX format SBOM
+            # cdxgen natively emits CycloneDX
             generate_cyclonedx_sbom "$scan_path" "$output_file"
+            ;;
+        spdx)
+            # cdxgen emits CycloneDX, then convert to SPDX
+            generate_spdx_sbom "$scan_path" "$output_file"
             ;;
         *)
             echo "❌ Unsupported format: $format"
-            echo "  Supported formats: spdx, cyclonedx"
+            echo "  Supported formats: cyclonedx, spdx"
             exit 1
             ;;
     esac
 }
 
-# Function to generate SPDX format SBOM
-generate_spdx_sbom() {
+# Run cdxgen against a path and write a CycloneDX SBOM to the given file.
+# --no-install-deps keeps the scan deterministic and offline: cdxgen relies on
+# lockfiles / manifests instead of invoking package managers to install deps.
+run_cdxgen() {
     local scan_path=$1
     local output_file=$2
-    
-    cat > "$output_file" <<EOF
-{
-  "spdxVersion": "SPDX-2.3",
-  "dataLicense": "CC0-1.0",
-  "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "Project SBOM",
-  "documentNamespace": "https://example.com/sbom",
-  "creationInfo": {
-    "created": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
-    "creators": ["Tool: rakuten-sbom-action"]
-  },
-  "packages": []
-}
-EOF
+
+    cdxgen \
+        --no-install-deps \
+        --recurse \
+        --project-name "$(basename "$(cd "$scan_path" && pwd)")" \
+        --output "$output_file" \
+        "$scan_path"
 }
 
-# Function to generate CycloneDX format SBOM
+# Generate a CycloneDX SBOM directly with cdxgen.
 generate_cyclonedx_sbom() {
     local scan_path=$1
     local output_file=$2
-    
-    cat > "$output_file" <<EOF
-{
-  "bomFormat": "CycloneDX",
-  "specVersion": "1.4",
-  "version": 1,
-  "metadata": {
-    "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
-    "tools": [
-      {
-        "vendor": "Rakuten",
-        "name": "rakuten-sbom-action",
-        "version": "1.0.0"
-      }
-    ]
-  },
-  "components": []
+
+    run_cdxgen "$scan_path" "$output_file"
 }
-EOF
+
+# Generate an SPDX SBOM by producing CycloneDX with cdxgen and converting it
+# with cyclonedx-cli.
+generate_spdx_sbom() {
+    local scan_path=$1
+    local output_file=$2
+    local cdx_tmp
+
+    cdx_tmp="$(mktemp)"
+    run_cdxgen "$scan_path" "$cdx_tmp"
+
+    echo "🔄 Converting CycloneDX SBOM to SPDX..."
+    cyclonedx convert \
+        --input-file "$cdx_tmp" \
+        --input-format json \
+        --output-file "$output_file" \
+        --output-format spdxjson
+
+    rm -f "$cdx_tmp"
 }
 
 # Main execution

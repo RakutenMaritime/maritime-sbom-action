@@ -60,8 +60,8 @@ jobs:
 ```json
 {
   "metadata": {
-    "repository": "RakutenMaritime/maritime-sbom-action",
-    "repositoryUrl": "https://github.com/RakutenMaritime/maritime-sbom-action",
+    "repository": "your-org/your-app",
+    "repositoryUrl": "https://github.com/your-org/your-app",
     "ref": "refs/heads/main",
     "branch": "main",
     "commit": "abcdef1234567890",
@@ -78,8 +78,10 @@ jobs:
 }
 ```
 
-`metadata`에는 분석 대상 소스의 저장소·커밋 정보가 담기며 (GitHub Actions 환경변수
-우선, 없으면 git으로 폴백), 이 정보는 SBOM에 포함되어 **upload 시 API로 함께 전송**됩니다.
+`metadata`는 **이 액션을 실행하는 (분석 대상) 저장소**의 정보입니다. 액션 자신의
+저장소가 아니라, 워크플로우가 돌아가는 소비자 repo의 `GITHUB_REPOSITORY`/`GITHUB_SHA`
+등을 사용하며 (없으면 scan 경로의 git으로 폴백), 이 정보는 SBOM에 포함되어 **upload
+시 API로 함께 전송**됩니다.
 
 | Input | Description | Default |
 |-------|-------------|---------|

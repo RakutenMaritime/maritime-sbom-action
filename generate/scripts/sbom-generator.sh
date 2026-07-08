@@ -35,8 +35,6 @@ COMMIT_MESSAGE=""
 COMMIT_AUTHOR=""
 COMMIT_DATE=""
 PARENT_COMMIT=""
-PARENT_MESSAGE=""
-PARENT_AUTHOR=""
 PARENT_DATE=""
 TAGS=""
 
@@ -57,8 +55,6 @@ if command -v git >/dev/null 2>&1 && git -C "$SCAN_PATH" rev-parse --is-inside-w
     # Parent (previous) commit, when history is available (needs fetch-depth: 0).
     PARENT_COMMIT="$(git -C "$SCAN_PATH" rev-parse --verify -q HEAD~1 2>/dev/null || true)"
     if [ -n "$PARENT_COMMIT" ]; then
-        PARENT_MESSAGE="$(git -C "$SCAN_PATH" log -1 --pretty=%s "$PARENT_COMMIT" 2>/dev/null || true)"
-        PARENT_AUTHOR="$(git -C "$SCAN_PATH" log -1 --pretty='%an <%ae>' "$PARENT_COMMIT" 2>/dev/null || true)"
         PARENT_DATE="$(git -C "$SCAN_PATH" log -1 --pretty=%cI "$PARENT_COMMIT" 2>/dev/null || true)"
     fi
 
@@ -88,8 +84,6 @@ jq \
   --arg commitAuthor "$COMMIT_AUTHOR" \
   --arg commitDate "$COMMIT_DATE" \
   --arg parentCommit "$PARENT_COMMIT" \
-  --arg parentMessage "$PARENT_MESSAGE" \
-  --arg parentAuthor "$PARENT_AUTHOR" \
   --arg parentDate "$PARENT_DATE" \
   --arg tags "$TAGS" \
   --arg generatedAt "$GENERATED_AT" \
@@ -109,8 +103,6 @@ jq \
         if ($parentCommit | orNull) == null then null
         else ({
           commit: ($parentCommit | orNull),
-          message: ($parentMessage | orNull),
-          author: ($parentAuthor | orNull),
           date: ($parentDate | orNull)
         } | with_entries(select(.value != null))) end
       ),

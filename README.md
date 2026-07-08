@@ -70,8 +70,6 @@ jobs:
     "commitDate": "2026-07-08T17:08:30+09:00",
     "parentCommit": {
       "commit": "0123456789abcdef",
-      "message": "...",
-      "author": "Name <email>",
       "date": "2026-07-08T16:50:00+09:00"
     },
     "tags": ["v1.2.3"],

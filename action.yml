@@ -1,0 +1,29 @@
+name: 'Rakuten SBOM Action'
+description: 'Generate Software Bill of Materials (SBOM) for your project'
+author: 'Rakuten Symphony'
+
+inputs:
+  format:
+    description: 'SBOM format (spdx, cyclonedx)'
+    required: false
+    default: 'cyclonedx'
+  output-file:
+    description: 'Output file path for SBOM'
+    required: false
+    default: 'sbom.json'
+  scan-path:
+    description: 'Path to scan for dependencies'
+    required: false
+    default: '.'
+
+outputs:
+  sbom-file:
+    description: 'Path to generated SBOM file'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.scan-path }}
+    - ${{ inputs.format }}
+    - ${{ inputs.output-file }}

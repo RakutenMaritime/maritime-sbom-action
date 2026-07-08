@@ -1,0 +1,27 @@
+#!/bin/bash
+
+set -e
+
+# Script behavior
+SCAN_PATH="${1:-.}"
+FORMAT="${2:-spdx}"
+OUTPUT_FILE="${3:-sbom.json}"
+
+echo "🔍 Starting SBOM generation..."
+echo "  Scan Path: $SCAN_PATH"
+echo "  Format: $FORMAT"
+echo "  Output File: $OUTPUT_FILE"
+
+# Call the SBOM generator script
+/opt/sbom/scripts/sbom-generator.sh "$SCAN_PATH" "$FORMAT" "$OUTPUT_FILE"
+
+if [ -f "$OUTPUT_FILE" ]; then
+    echo "✅ SBOM generated successfully"
+    echo "📄 Output: $OUTPUT_FILE"
+    
+    # Set output variable for GitHub Actions
+    echo "sbom-file=$OUTPUT_FILE" >> "$GITHUB_OUTPUT"
+else
+    echo "❌ Failed to generate SBOM"
+    exit 1
+fi

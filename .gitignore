@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+/venv
+/__pycache__
+*.pyc
+
+# Generated files
+sbom.json
+sbom.xml
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+.env.local
+.env.*.local

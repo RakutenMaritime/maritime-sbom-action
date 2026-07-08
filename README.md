@@ -18,14 +18,14 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Generate SBOM
-        uses: rakuten-symphony/sbom-action@v1
+        uses: RakutenMaritime/maritime-sbom-action
 ```
 
 ### 옵션 지정
 
 ```yaml
 - name: Generate SBOM with Options
-  uses: rakuten-symphony/sbom-action@v1
+  uses: RakutenMaritime/maritime-sbom-action
   with:
     format: 'cyclonedx'          # spdx or cyclonedx (default: spdx)
     scan-path: './src'           # 스캔 경로 (default: .)
@@ -51,7 +51,7 @@ jobs:
 ```yaml
 - name: Generate SBOM
   id: sbom
-  uses: rakuten-symphony/sbom-action@v1
+  uses: RakutenMaritime/maritime-sbom-action
 
 - name: Upload SBOM
   uses: actions/upload-artifact@v3

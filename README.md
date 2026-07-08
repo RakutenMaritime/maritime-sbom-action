@@ -109,11 +109,31 @@ jobs:
 `api-key`가 있으면 `X-Api-Key` 헤더로 전송하며, 응답이 2xx가 아니면 실패합니다.
 `api-url`이 비어 있으면 업로드를 건너뜁니다.
 
+`signing-secret`을 지정하면 전송 본문을 HMAC-SHA256으로 서명해
+`X-Signature-256: sha256=<hex>` 헤더로 함께 보냅니다 (GitHub 웹훅과 동일한 방식).
+서버는 동일한 시크릿으로 수신 본문의 HMAC을 다시 계산해 일치 여부로 페이로드
+위변조를 검증할 수 있습니다.
+
 | Input | Description | Default |
 |-------|-------------|---------|
 | `sbom-file` | 업로드할 SBOM 파일 경로 | `sbom.json` |
 | `api-url` | POST 대상 URL. 비어 있으면 업로드 스킵 | `''` |
 | `api-key` | `X-Api-Key` 헤더로 전송할 API 키 | `''` |
+| `signing-secret` | HMAC-SHA256 페이로드 서명용 공유 시크릿. 지정 시 `X-Signature-256` 헤더로 전송 | `''` |
+
+서버 측 검증 예시 (Node.js):
+
+```js
+const crypto = require('crypto');
+
+// rawBody: 수신한 원본 요청 바디(Buffer/string), 서명 검증은 파싱 전에 수행
+const expected = 'sha256=' +
+  crypto.createHmac('sha256', SIGNING_SECRET).update(rawBody).digest('hex');
+const got = req.headers['x-signature-256'] || '';
+const ok = got.length === expected.length &&
+  crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected));
+if (!ok) return res.status(401).send('invalid signature');
+```
 
 ## 🏗️ 프로젝트 구조
 

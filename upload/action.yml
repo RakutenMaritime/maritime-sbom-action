@@ -1,5 +1,5 @@
 name: 'Rakuten SBOM Upload'
-description: 'POST a generated SBOM file to an API endpoint (X-Api-Key auth)'
+description: 'POST a generated SBOM file to an API endpoint (X-Api-Key auth, optional HMAC payload signature)'
 author: 'Rakuten Symphony'
 
 inputs:
@@ -15,6 +15,10 @@ inputs:
     description: 'API key sent as the X-Api-Key header'
     required: false
     default: ''
+  signing-secret:
+    description: 'Shared secret for HMAC-SHA256 signing of the payload. When set, the request body is signed and sent as the X-Signature-256 header (sha256=<hex>) so the server can verify the payload was not tampered with.'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -24,4 +28,5 @@ runs:
         SBOM_FILE: ${{ inputs.sbom-file }}
         API_URL: ${{ inputs.api-url }}
         API_KEY: ${{ inputs.api-key }}
+        SIGNING_SECRET: ${{ inputs.signing-secret }}
       run: ${{ github.action_path }}/upload.sh

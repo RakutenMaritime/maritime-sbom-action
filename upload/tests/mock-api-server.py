@@ -25,6 +25,7 @@ class Handler(BaseHTTPRequestHandler):
         with open(header_out, 'w') as f:
             f.write((self.headers.get('X-Api-Key', '') or '') + '\n')
             f.write((self.headers.get('Content-Type', '') or '') + '\n')
+            f.write((self.headers.get('X-Signature-256', '') or '') + '\n')
         self.send_response(status)
         self.end_headers()
         self.wfile.write(b'ok')

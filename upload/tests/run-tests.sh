@@ -23,6 +23,7 @@ require() {
 
 require curl
 require python3
+require openssl
 
 # A small sample SBOM to upload (includes source metadata).
 SAMPLE="$(mktemp)"
@@ -30,9 +31,10 @@ cat > "$SAMPLE" <<'EOF'
 {"metadata":{"repository":"RakutenMaritime/maritime-sbom-action","commit":"abcdef1234567890","branch":"main","generator":"cdxgen"},"componentCount":1,"components":[{"name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21","type":"library","group":""}]}
 EOF
 
-# run_upload <mock-status> <api-key> <sbom-file> -> sets BODY/HDR/UPLOAD_RC.
+# run_upload <mock-status> <api-key> <sbom-file> [signing-secret]
+#   -> sets BODY/HDR/UPLOAD_RC.
 run_upload() {
-    local mock_status=$1 api_key=$2 sbom_file=$3
+    local mock_status=$1 api_key=$2 sbom_file=$3 signing_secret=${4:-}
     BODY="$(mktemp)"; HDR="$(mktemp)"; local portfile; portfile="$(mktemp)"
     python3 "$MOCK" "$BODY" "$HDR" "$mock_status" >"$portfile" 2>/dev/null &
     local mock_pid=$!
@@ -44,6 +46,7 @@ run_upload() {
     SBOM_FILE="$sbom_file" \
     API_URL="http://127.0.0.1:$port" \
     API_KEY="$api_key" \
+    SIGNING_SECRET="$signing_secret" \
         bash "$UPLOAD" >/tmp/upload.log 2>&1
     UPLOAD_RC=$?
     # The mock exits after one request (or its timeout); reap it without hanging.
@@ -108,6 +111,46 @@ if head -n1 "$HDR" 2>/dev/null | grep -q "test-key-123"; then
     pass "API received the X-Api-Key header"
 else
     fail "API did not receive the X-Api-Key header"
+fi
+# Without a signing secret, no signature header must be sent (backward compat).
+if [ -z "$(sed -n '3p' "$HDR" 2>/dev/null)" ]; then
+    pass "no X-Signature-256 header when signing secret is unset"
+else
+    fail "unexpected X-Signature-256 header without a signing secret"
+fi
+rm -f "$BODY" "$HDR"
+
+# ---- Test: payload is HMAC-signed when a signing secret is set -----------
+echo "▶ Payload is HMAC-signed with X-Signature-256"
+run_upload 200 "test-key-123" "$SAMPLE" "s3cr3t-signing-key"
+if [ "$UPLOAD_RC" -eq 0 ]; then
+    got_sig="$(sed -n '3p' "$HDR" 2>/dev/null)"
+    # Recompute the HMAC over the body the server actually received.
+    want_sig="sha256=$(openssl dgst -sha256 -hmac "s3cr3t-signing-key" "$BODY" | awk '{print $NF}')"
+    if [ -n "$got_sig" ] && [ "$got_sig" = "$want_sig" ]; then
+        pass "API received a valid X-Signature-256 over the exact body"
+    else
+        fail "X-Signature-256 missing/incorrect (got '$got_sig', want '$want_sig')"
+    fi
+else
+    fail "signed upload failed (rc=$UPLOAD_RC)"; cat /tmp/upload.log
+fi
+rm -f "$BODY" "$HDR"
+
+# ---- Test: a tampered body fails signature verification ------------------
+echo "▶ Tampered body fails signature verification"
+run_upload 200 "test-key-123" "$SAMPLE" "s3cr3t-signing-key"
+if [ "$UPLOAD_RC" -eq 0 ]; then
+    got_sig="$(sed -n '3p' "$HDR" 2>/dev/null)"
+    # Signature over the ORIGINAL bytes must not validate against modified bytes.
+    tampered="sha256=$(printf '%s tampered' "$(cat "$BODY")" | openssl dgst -sha256 -hmac "s3cr3t-signing-key" | awk '{print $NF}')"
+    if [ -n "$got_sig" ] && [ "$got_sig" != "$tampered" ]; then
+        pass "signature does not validate against a modified body"
+    else
+        fail "signature unexpectedly matched a tampered body"
+    fi
+else
+    fail "signed upload failed (rc=$UPLOAD_RC)"; cat /tmp/upload.log
 fi
 rm -f "$BODY" "$HDR"
 

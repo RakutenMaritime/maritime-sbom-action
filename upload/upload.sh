@@ -3,9 +3,12 @@
 # Upload an SBOM file to an API endpoint via HTTP POST.
 #
 # Environment:
-#   SBOM_FILE  Path to the SBOM file to upload (default: sbom.json)
-#   API_URL    Endpoint to POST to. Empty -> upload is skipped.
-#   API_KEY    Optional; sent as the X-Api-Key header when present.
+#   SBOM_FILE       Path to the SBOM file to upload (default: sbom.json)
+#   API_URL         Endpoint to POST to. Empty -> upload is skipped.
+#   API_KEY         Optional; sent as the X-Api-Key header when present.
+#   SIGNING_SECRET  Optional; when set, the request body is signed with
+#                   HMAC-SHA256 and sent as the X-Signature-256 header so the
+#                   server can detect payload tampering / forgery.
 
 set -e
 
@@ -33,10 +36,32 @@ if [ -n "${API_KEY:-}" ]; then
     auth_args=(-H "X-Api-Key: ${API_KEY}")
 fi
 
+# Sign the payload so the server can verify it was not tampered with in
+# transit. We HMAC-SHA256 the exact bytes we POST (the SBOM file) with a shared
+# secret and send the hex digest, matching the GitHub webhook convention:
+#   X-Signature-256: sha256=<hex digest>
+# The server recomputes the HMAC over the received body with the same secret
+# and rejects the request if the digests differ.
+sig_args=()
+if [ -n "${SIGNING_SECRET:-}" ]; then
+    if ! command -v openssl >/dev/null 2>&1; then
+        echo "❌ SIGNING_SECRET is set but openssl is unavailable to sign the payload"
+        exit 1
+    fi
+    signature="$(openssl dgst -sha256 -hmac "$SIGNING_SECRET" "$SBOM_FILE" | awk '{print $NF}')"
+    if [ -z "$signature" ]; then
+        echo "❌ Failed to compute the payload signature"
+        exit 1
+    fi
+    sig_args=(-H "X-Signature-256: sha256=${signature}")
+    echo "🔏 Signing payload with HMAC-SHA256 (X-Signature-256)"
+fi
+
 response_body="$(mktemp)"
 http_code="$(curl -sS -X POST \
     -H "Content-Type: application/json" \
     "${auth_args[@]}" \
+    "${sig_args[@]}" \
     --data-binary "@${SBOM_FILE}" \
     -o "$response_body" \
     -w '%{http_code}' \

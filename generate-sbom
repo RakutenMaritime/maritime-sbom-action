@@ -4,16 +4,14 @@ set -e
 
 # Script behavior
 SCAN_PATH="${1:-.}"
-FORMAT="${2:-cyclonedx}"
-OUTPUT_FILE="${3:-sbom.json}"
+OUTPUT_FILE="${2:-sbom.json}"
 
 echo "🔍 Starting SBOM generation..."
 echo "  Scan Path: $SCAN_PATH"
-echo "  Format: $FORMAT"
 echo "  Output File: $OUTPUT_FILE"
 
 # Call the SBOM generator script
-/opt/sbom/scripts/sbom-generator.sh "$SCAN_PATH" "$FORMAT" "$OUTPUT_FILE"
+/opt/sbom/scripts/sbom-generator.sh "$SCAN_PATH" "$OUTPUT_FILE"
 
 if [ ! -f "$OUTPUT_FILE" ]; then
     echo "❌ Failed to generate SBOM"

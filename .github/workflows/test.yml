@@ -26,8 +26,8 @@ jobs:
         id: sbom
         uses: ./
         with:
-          format: cyclonedx
           output-file: sbom.json
+          api-url: ''   # skip upload in CI self-test
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4

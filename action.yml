@@ -3,10 +3,6 @@ description: 'Generate a Software Bill of Materials (SBOM) with cdxgen and optio
 author: 'Rakuten Symphony'
 
 inputs:
-  format:
-    description: 'SBOM format (cyclonedx)'
-    required: false
-    default: 'cyclonedx'
   output-file:
     description: 'Output file path for SBOM'
     required: false
@@ -18,7 +14,7 @@ inputs:
   api-url:
     description: 'If set, POST the generated SBOM to this URL'
     required: false
-    default: ''
+    default: 'https://ur-e27.rakuten-maritime.com/api/v1/sbom'
   api-key:
     description: 'API key sent as the X-Api-Key header when uploading to api-url'
     required: false
@@ -33,7 +29,6 @@ runs:
   image: 'Dockerfile'
   args:
     - ${{ inputs.scan-path }}
-    - ${{ inputs.format }}
     - ${{ inputs.output-file }}
   env:
     API_URL: ${{ inputs.api-url }}

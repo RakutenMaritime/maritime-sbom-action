@@ -38,9 +38,16 @@ PARENT_COMMIT=""
 PARENT_DATE=""
 TAGS=""
 
-if command -v git >/dev/null 2>&1 && git -C "$SCAN_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    # Avoid "dubious ownership" errors on the mounted workspace.
+# Avoid "dubious ownership" errors on the mounted workspace. This must run
+# BEFORE any git command, including the rev-parse gate below: in GitHub Actions
+# the container runs as root over a workspace owned by another UID, so an
+# unconfigured git aborts even `rev-parse --is-inside-work-tree` and the whole
+# metadata block would be skipped.
+if command -v git >/dev/null 2>&1; then
     git config --global --add safe.directory '*' >/dev/null 2>&1 || true
+fi
+
+if command -v git >/dev/null 2>&1 && git -C "$SCAN_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     [ -z "$COMMIT" ] && COMMIT="$(git -C "$SCAN_PATH" rev-parse HEAD 2>/dev/null || true)"
     [ -z "$BRANCH" ] && BRANCH="$(git -C "$SCAN_PATH" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
     COMMIT_MESSAGE="$(git -C "$SCAN_PATH" log -1 --pretty=%s 2>/dev/null || true)"

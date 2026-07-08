@@ -14,7 +14,7 @@ inputs:
   api-url:
     description: 'If set, POST the generated SBOM to this URL'
     required: false
-    default: 'https://ur-e27.rakuten-maritime.com/api/v1/sbom'
+    default: ''
   api-key:
     description: 'API key sent as the X-Api-Key header when uploading to api-url'
     required: false

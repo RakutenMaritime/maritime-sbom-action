@@ -117,6 +117,3 @@ upload/tests/run-tests.sh
 
 MIT
 
-## 👥 기여
-
-문제를 발견하거나 개선 사항이 있다면 이슈를 등록하거나 PR을 보내주세요.

@@ -30,6 +30,9 @@ jobs:
           scan-path: '.'           # 스캔 경로 (default: .)
           output-file: 'sbom.json' # 출력 파일 경로 (default: sbom.json)
 
+      - name: Display SBOM
+        run: cat ${{ steps.sbom.outputs.sbom-file }}
+
       - name: Upload SBOM
         uses: RakutenMaritime/maritime-sbom-action/upload@main
         with:
@@ -71,6 +74,9 @@ jobs:
 | Output | Description |
 |--------|-------------|
 | `sbom-file` | 생성된 SBOM 파일 경로 |
+
+생성 결과는 로그에 목록으로 출력되며, GitHub Actions의 **Job Summary**에 컴포넌트
+표로도 표시됩니다.
 
 ## 📡 upload action
 

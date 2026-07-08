@@ -35,6 +35,9 @@ jobs:
         with:
           output-file: sbom.json
 
+      - name: Display SBOM
+        run: cat ${{ steps.sbom.outputs.sbom-file }}
+
       - name: Upload SBOM
         uses: ./upload
         with:

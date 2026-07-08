@@ -25,3 +25,21 @@ echo "📄 Output: $OUTPUT_FILE"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "sbom-file=$OUTPUT_FILE" >> "$GITHUB_OUTPUT"
 fi
+
+# Display the generated SBOM: a component count + table to the logs, and the
+# same table to the GitHub job summary when running in Actions.
+component_count="$(jq -r '.componentCount // (.components | length)' "$OUTPUT_FILE")"
+echo "📊 SBOM contains ${component_count} component(s):"
+jq -r '.components[]? | "  - \(.name)@\(.version) (\(.purl))"' "$OUTPUT_FILE"
+
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    {
+        echo "### 📦 SBOM (\`${OUTPUT_FILE}\`)"
+        echo
+        echo "**Components: ${component_count}**"
+        echo
+        echo "| Name | Version | Type | purl |"
+        echo "|------|---------|------|------|"
+        jq -r '.components[]? | "| \(.name) | \(.version) | \(.type // "") | `\(.purl)` |"' "$OUTPUT_FILE"
+    } >> "$GITHUB_STEP_SUMMARY"
+fi

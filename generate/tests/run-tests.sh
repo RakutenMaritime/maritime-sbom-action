@@ -36,8 +36,10 @@ run_generate() {
     WORKDIR="$(mktemp -d)"
     cp -R "$FIXTURE/." "$WORKDIR/"
     : > "$WORKDIR/gh_output"
+    : > "$WORKDIR/step_summary.md"
     docker run --rm --platform "$PLATFORM" \
         -e GITHUB_OUTPUT=/github/workspace/gh_output \
+        -e GITHUB_STEP_SUMMARY=/github/workspace/step_summary.md \
         -v "$WORKDIR:/github/workspace" \
         "$IMAGE" "$scan_path" "$output"
 }
@@ -73,6 +75,9 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     grep -q "sbom-file=sbom.json" "$WORKDIR/gh_output" \
         && pass "sets sbom-file GitHub output" \
         || fail "did not set sbom-file output"
+    grep -q "pkg:npm/lodash@4.17.21" "$WORKDIR/step_summary.md" \
+        && pass "writes component table to job summary" \
+        || fail "did not write job summary"
 else
     fail "generation run exited non-zero"; cat /tmp/gen.log
 fi

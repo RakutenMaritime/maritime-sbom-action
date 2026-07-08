@@ -90,6 +90,12 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     else
         fail "source metadata missing/incorrect"; jq '.metadata' "$out" 2>/dev/null
     fi
+    # git-only fields are unavailable here (no git repo), so they must be omitted.
+    if [ "$(jq '.metadata | has("commitMessage") or has("commitAuthor") or has("commitDate")' "$out")" = "false" ]; then
+        pass "omits null metadata fields"
+    else
+        fail "null metadata fields were not omitted"; jq '.metadata' "$out" 2>/dev/null
+    fi
 else
     fail "generation run exited non-zero"; cat /tmp/gen.log
 fi

@@ -70,7 +70,7 @@ jq \
   '
   def orNull: if . == "" then null else . end;
   {
-    metadata: {
+    metadata: ({
       repository: ($repository | orNull),
       repositoryUrl: ($repositoryUrl | orNull),
       ref: ($ref | orNull),
@@ -81,7 +81,7 @@ jq \
       commitDate: ($commitDate | orNull),
       generatedAt: $generatedAt,
       generator: "cdxgen"
-    },
+    } | with_entries(select(.value != null))),
     componentCount: ((.components // []) | length),
     components: [
       (.components // [])[] | {

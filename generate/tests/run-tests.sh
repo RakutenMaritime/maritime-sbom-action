@@ -123,8 +123,8 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     out="$WORKDIR/sbom.json"
     save_sbom "$out" "plain"
     if [ -f "$out" ] \
-        && [ "$(jq '.componentCount' "$out")" -ge 1 ] \
-        && [ "$(jq -r '.components[0].purl' "$out")" = "pkg:npm/lodash@4.17.21" ] \
+        && [ "$(jq '.componentCount' "$out")" -ge 3 ] \
+        && [ "$(jq -r '.components[] | select(.name=="lodash") | .purl' "$out")" = "pkg:npm/lodash@4.17.21" ] \
         && [ "$(jq '[.components[] | select(.name=="lodash" and .version=="4.17.21")] | length' "$out")" -ge 1 ]; then
         pass "plain SBOM lists lodash with name/version/purl"
     else
@@ -165,18 +165,29 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
         fail "component ref/licenses/supplier/dependsOn fields missing"; jq '.components' "$out" 2>/dev/null
     fi
     # Dependencies live inside each component as direct dependsOn refs; lodash
-    # is a leaf so its dependsOn is empty. Transitive deps are the closure of
-    # dependsOn across components.
+    # is a leaf so its dependsOn is empty.
     if [ "$(jq -c '.components[] | select(.name=="lodash") | .dependsOn' "$out" 2>/dev/null)" = "[]" ]; then
         pass "component carries direct dependsOn (lodash is a leaf: [])"
     else
         fail "component dependsOn missing/incorrect"; jq '.components' "$out" 2>/dev/null
     fi
-    # The scanned project's top-level dependencies are preserved in metadata,
-    # with lodash as a direct dependency.
+    # Transitive dependency (depth 2): strip-ansi -> ansi-regex. ansi-regex is
+    # reachable only via strip-ansi, so it must appear as its own component and
+    # strip-ansi must list it in dependsOn.
+    if [ "$(jq '.components[] | select(.name=="strip-ansi") | .dependsOn | index("pkg:npm/ansi-regex@5.0.1") != null' "$out" 2>/dev/null)" = "true" ] \
+        && [ "$(jq '[.components[] | select(.name=="ansi-regex")] | length' "$out" 2>/dev/null)" -ge 1 ] \
+        && [ "$(jq -c '.components[] | select(.name=="ansi-regex") | .dependsOn' "$out" 2>/dev/null)" = "[]" ]; then
+        pass "represents transitive dependency via dependsOn (strip-ansi -> ansi-regex)"
+    else
+        fail "transitive dependsOn missing/incorrect"; jq '.components' "$out" 2>/dev/null
+    fi
+    # The scanned project's top-level (direct) dependencies are preserved in
+    # metadata: lodash and strip-ansi, but NOT the transitive ansi-regex.
     if [ "$(jq -r '.metadata.rootRef' "$out" 2>/dev/null)" != "null" ] \
-        && [ "$(jq '(.metadata.directDependencies // []) | index("pkg:npm/lodash@4.17.21") != null' "$out" 2>/dev/null)" = "true" ]; then
-        pass "records rootRef and directDependencies (project -> lodash)"
+        && [ "$(jq '(.metadata.directDependencies // []) | index("pkg:npm/lodash@4.17.21") != null' "$out" 2>/dev/null)" = "true" ] \
+        && [ "$(jq '(.metadata.directDependencies // []) | index("pkg:npm/strip-ansi@6.0.1") != null' "$out" 2>/dev/null)" = "true" ] \
+        && [ "$(jq '(.metadata.directDependencies // []) | index("pkg:npm/ansi-regex@5.0.1") == null' "$out" 2>/dev/null)" = "true" ]; then
+        pass "records rootRef and direct-only directDependencies (excludes transitive ansi-regex)"
     else
         fail "rootRef/directDependencies missing/incorrect"; jq '{rootRef: .metadata.rootRef, directDependencies: .metadata.directDependencies}' "$out" 2>/dev/null
     fi

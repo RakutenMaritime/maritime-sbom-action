@@ -4,6 +4,7 @@
   "description": "Fixture project for SBOM action integration tests",
   "license": "MIT",
   "dependencies": {
-    "lodash": "^4.17.21"
+    "lodash": "^4.17.21",
+    "strip-ansi": "^6.0.1"
   }
 }

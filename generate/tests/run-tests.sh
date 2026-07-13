@@ -58,10 +58,40 @@ if [ "${SKIP_BUILD:-}" = "1" ]; then
     echo "▶ Skipping build, using image: $IMAGE"
 else
     echo "▶ Building image: $IMAGE"
-    if docker build --platform "$PLATFORM" -t "$IMAGE" "$ACTION_DIR" >/dev/null 2>&1; then
+    # Fail early with a clear reason if the Docker daemon isn't reachable,
+    # rather than surfacing a confusing build error further down.
+    if ! docker info >/dev/null 2>&1; then
+        fail "docker image builds"
+        echo "   Reason: cannot reach the Docker daemon. Is Docker running?"
+        echo "   Try:    docker info"
+        exit 1
+    fi
+    # Keep the build log so a failure can explain *why* instead of a bare
+    # 'Build failed'. The build is otherwise quiet to avoid noisy output.
+    build_log="$(mktemp)"
+    if docker build --platform "$PLATFORM" -t "$IMAGE" "$ACTION_DIR" >"$build_log" 2>&1; then
         pass "docker image builds"
+        rm -f "$build_log"
     else
-        fail "docker image builds"; echo "Build failed; aborting."; exit 1
+        fail "docker image builds"
+        echo "   Reason: 'docker build' exited non-zero. Full build log below:"
+        echo "   ----------------------------------------------------------------"
+        sed 's/^/   | /' "$build_log"
+        echo "   ----------------------------------------------------------------"
+        # Point at the usual suspects seen in the raw log above.
+        if grep -qiE "certificate not trusted|tls|x509|self.signed" "$build_log"; then
+            echo "   Hint: TLS/certificate error fetching packages — likely a network"
+            echo "         proxy or restricted environment, not a code problem."
+        elif grep -qiE "no such package|unable to select packages" "$build_log"; then
+            echo "   Hint: apk could not fetch its package index (network/mirror issue)."
+        elif grep -qiE "ETIMEDOUT|ENOTFOUND|network|getaddrinfo|could not resolve" "$build_log"; then
+            echo "   Hint: network could not be reached during the build."
+        elif grep -qiE "no space left" "$build_log"; then
+            echo "   Hint: the Docker builder ran out of disk space (try 'docker system prune')."
+        fi
+        rm -f "$build_log"
+        echo "Build failed; aborting."
+        exit 1
     fi
 fi
 

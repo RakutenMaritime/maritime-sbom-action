@@ -167,6 +167,13 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     else
         fail "component license missing/incorrect"; jq '.components' "$out" 2>/dev/null
     fi
+    # Component content hash is carried through as { alg, content }.
+    if [ "$(jq -r '.components[] | select(.name=="lodash") | .hashes[0].alg' "$out" 2>/dev/null)" = "SHA-512" ] \
+        && [ -n "$(jq -r '.components[] | select(.name=="lodash") | .hashes[0].content // empty' "$out" 2>/dev/null)" ]; then
+        pass "extracts component hash (lodash -> SHA-512)"
+    else
+        fail "component hash missing/incorrect"; jq '[.components[] | {name, hashes}]' "$out" 2>/dev/null
+    fi
     # Every component carries ref plus per-component dependsOn/licenses/supplier.
     if [ "$(jq -r '.components[] | select(.name=="lodash") | .ref' "$out" 2>/dev/null)" = "pkg:npm/lodash@4.17.21" ] \
         && [ "$(jq '[.components[] | select(has("licenses") and has("supplier") and has("dependsOn"))] | length' "$out" 2>/dev/null)" -ge 1 ]; then

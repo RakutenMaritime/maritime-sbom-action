@@ -55,7 +55,7 @@ run_nocrash "component without ref/purl" '{"components":[{"name":"x"}],"dependen
 DOC='{
   "metadata": { "component": { "bom-ref": "pkg:npm/app@1.0.0", "purl": "pkg:npm/app@1.0.0" } },
   "components": [
-    { "bom-ref": "pkg:npm/strip-ansi@6.0.1", "name": "strip-ansi", "version": "6.0.1", "purl": "pkg:npm/strip-ansi@6.0.1", "type": "library", "licenses": [{"license":{"id":"MIT"}}], "publisher": "Sindre" },
+    { "bom-ref": "pkg:npm/strip-ansi@6.0.1", "name": "strip-ansi", "version": "6.0.1", "purl": "pkg:npm/strip-ansi@6.0.1", "type": "library", "licenses": [{"license":{"id":"MIT"}}], "publisher": "Sindre", "hashes": [{"alg":"SHA-512","content":"abc123"}] },
     { "bom-ref": "pkg:npm/ansi-regex@5.0.1", "name": "ansi-regex", "version": "5.0.1", "purl": "pkg:npm/ansi-regex@5.0.1", "type": "library", "licenses": [{"license":{"name":"MIT License"}}] }
   ],
   "dependencies": [
@@ -76,6 +76,8 @@ check "directDependencies"             '.metadata.directDependencies' '["pkg:npm
 check "license via SPDX id"            '.components[]|select(.name=="strip-ansi").licenses' '["MIT"]'
 check "license via name"               '.components[]|select(.name=="ansi-regex").licenses' '["MIT License"]'
 check "supplier via publisher"         '.components[]|select(.name=="strip-ansi").supplier' '"Sindre"'
+check "hashes preserved (alg/content)"  '.components[]|select(.name=="strip-ansi").hashes' '[{"alg":"SHA-512","content":"abc123"}]'
+check "hashes null when absent"         '.components[]|select(.name=="ansi-regex").hashes' 'null'
 check "transitive dependsOn edge"      '.components[]|select(.name=="strip-ansi").dependsOn' '["pkg:npm/ansi-regex@5.0.1"]'
 check "leaf dependsOn is []"           '.components[]|select(.name=="ansi-regex").dependsOn' '[]'
 check "no top-level dependencies key"  'has("dependencies")' 'false'

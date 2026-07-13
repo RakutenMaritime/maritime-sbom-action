@@ -86,6 +86,7 @@ jobs:
       "type": "library",
       "group": null,
       "licenses": ["MIT"],
+      "hashes": [{ "alg": "SHA-512", "content": "…" }],
       "supplier": "...",
       "dependsOn": ["pkg:npm/b@2.0.0"]
     },
@@ -97,6 +98,7 @@ jobs:
       "type": "library",
       "group": null,
       "licenses": ["Apache-2.0"],
+      "hashes": null,
       "supplier": null,
       "dependsOn": []
     }
@@ -105,10 +107,11 @@ jobs:
 ```
 
 각 컴포넌트는 **구성요소**(`name`/`type`), **버전**(`version`), **라이선스**
-(`licenses`, SPDX id/name/expression 배열), **공급자**(`supplier`), 그리고 **직접
-의존성**(`dependsOn`, 이 컴포넌트가 직접 의존하는 다른 컴포넌트의 `ref` 목록)을
-포함합니다. `ref`는 `dependsOn`이 가리키는 식별자(주로 purl)입니다. 값이 없으면
-`null`(목록은 `[]`)로 유지됩니다.
+(`licenses`, SPDX id/name/expression 배열), **무결성 해시**(`hashes`, CycloneDX
+`{ alg, content }` 배열 — 예: lockfile integrity에서 유도한 SHA-512), **공급자**
+(`supplier`), 그리고 **직접 의존성**(`dependsOn`, 이 컴포넌트가 직접 의존하는 다른
+컴포넌트의 `ref` 목록)을 포함합니다. `ref`는 `dependsOn`이 가리키는 식별자(주로
+purl)입니다. 값이 없으면 `null`(목록은 `[]`)로 유지됩니다.
 
 **전이(transitive) 의존성**은 각 컴포넌트의 `dependsOn`을 따라가며 만들어지는
 전이 폐포(transitive closure)로 표현됩니다. 예: `directDependencies`의 `a`에서

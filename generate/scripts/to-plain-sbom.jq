@@ -60,6 +60,13 @@ def orNull: if . == "" then null else . end;
         | map(.license.id // .license.name // .expression // empty)
         | if length == 0 then null else . end
       ),
+      # Content hashes as CycloneDX { alg, content } pairs (e.g. SHA-512
+      # derived from the lockfile integrity). Null when none are available.
+      hashes: (
+        (.hashes // [])
+        | map(select(.content != null) | { alg: .alg, content: .content })
+        | if length == 0 then null else . end
+      ),
       # Supplier/provider of the component, best-effort from CycloneDX
       # supplier -> publisher -> author.
       supplier: (.supplier.name // .publisher // .author | orNull),

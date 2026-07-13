@@ -118,16 +118,40 @@ jq \
       ),
       generatedAt: $generatedAt,
       generator: "cdxgen",
-      actionVersion: ($actionVersion | orNull)
+      actionVersion: ($actionVersion | orNull),
+      # The root component of the scanned project; the entry point of the
+      # dependency graph below (its ref appears as a "ref" in dependencies).
+      rootRef: (.metadata.component."bom-ref" // .metadata.component.purl | orNull)
     } | with_entries(select(.value != null))),
     componentCount: ((.components // []) | length),
     components: [
       (.components // [])[] | {
+        # Stable identifier used to cross-reference the dependency graph.
+        ref: (."bom-ref" // .purl),
         name,
         version,
         purl,
         type,
-        group: (.group // null)
+        group: (.group | orNull),
+        # License identifiers: SPDX id, else license name, else an SPDX
+        # expression. Null when cdxgen could not determine any.
+        licenses: (
+          (.licenses // [])
+          | map(.license.id // .license.name // .expression // empty)
+          | if length == 0 then null else . end
+        ),
+        # Supplier/provider of the component, best-effort from CycloneDX
+        # supplier -> publisher -> author.
+        supplier: (.supplier.name // .publisher // .author | orNull)
+      }
+    ],
+    # Dependency graph as CycloneDX ref -> dependsOn edges. Transitive
+    # dependencies are represented by following each ref through the graph:
+    # the transitive closure of dependsOn from rootRef is the full tree.
+    dependencies: [
+      (.dependencies // [])[] | {
+        ref,
+        dependsOn: (.dependsOn // [])
       }
     ]
   }' "$cdx_tmp" > "$OUTPUT_FILE"

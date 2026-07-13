@@ -72,14 +72,38 @@ jobs:
     "parentCommitDate": "2026-07-08T16:50:00+09:00",
     "tags": ["v1.2.3"],
     "generatedAt": "2026-07-08T08:11:45Z",
-    "generator": "cdxgen"
+    "generator": "cdxgen",
+    "rootRef": "pkg:npm/your-app@1.0.0"
   },
-  "componentCount": 1,
+  "componentCount": 2,
   "components": [
-    { "name": "lodash", "version": "4.17.21", "purl": "pkg:npm/lodash@4.17.21", "type": "library", "group": "" }
+    {
+      "ref": "pkg:npm/lodash@4.17.21",
+      "name": "lodash",
+      "version": "4.17.21",
+      "purl": "pkg:npm/lodash@4.17.21",
+      "type": "library",
+      "group": null,
+      "licenses": ["MIT"],
+      "supplier": "..."
+    }
+  ],
+  "dependencies": [
+    { "ref": "pkg:npm/your-app@1.0.0", "dependsOn": ["pkg:npm/lodash@4.17.21"] },
+    { "ref": "pkg:npm/lodash@4.17.21", "dependsOn": [] }
   ]
 }
 ```
+
+각 컴포넌트는 **구성요소**(`name`/`type`), **버전**(`version`), **라이선스**
+(`licenses`, SPDX id/name/expression 배열), **공급자**(`supplier`)를 포함합니다.
+`ref`는 의존성 그래프와 상호 참조하기 위한 식별자(주로 purl)입니다. 값이 없으면
+`null`로 유지됩니다.
+
+`dependencies`는 CycloneDX **의존성 그래프**(`ref -> dependsOn` 엣지)입니다.
+**전이(transitive) 의존성**은 `rootRef`에서 시작해 `dependsOn`을 따라가며 만들어지는
+그래프의 전이 폐포(transitive closure)로 표현됩니다. `metadata.rootRef`는 스캔 대상
+프로젝트 자신(그래프의 시작점)을 가리킵니다.
 
 `metadata`는 **이 액션을 실행하는 (분석 대상) 저장소**의 정보입니다. 액션 자신의
 저장소가 아니라, 워크플로우가 돌아가는 소비자 repo의 `GITHUB_REPOSITORY`/`GITHUB_SHA`

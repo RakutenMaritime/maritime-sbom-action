@@ -98,6 +98,28 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     else
         fail "null metadata fields were not omitted"; jq '.metadata' "$out" 2>/dev/null
     fi
+    # Component license is extracted from the CycloneDX licenses field.
+    if [ "$(jq -r '.components[] | select(.name=="lodash") | .licenses[0]' "$out" 2>/dev/null)" = "MIT" ]; then
+        pass "extracts component license (lodash -> MIT)"
+    else
+        fail "component license missing/incorrect"; jq '.components' "$out" 2>/dev/null
+    fi
+    # Every component carries a ref used to cross-reference the dependency graph.
+    if [ "$(jq -r '.components[] | select(.name=="lodash") | .ref' "$out" 2>/dev/null)" = "pkg:npm/lodash@4.17.21" ] \
+        && [ "$(jq '[.components[] | select(has("licenses") and has("supplier"))] | length' "$out" 2>/dev/null)" -ge 1 ]; then
+        pass "components expose ref/licenses/supplier fields"
+    else
+        fail "component ref/licenses/supplier fields missing"; jq '.components' "$out" 2>/dev/null
+    fi
+    # Transitive dependencies are represented as a ref -> dependsOn graph, with
+    # the scanned project (rootRef) depending on lodash.
+    root_ref="$(jq -r '.metadata.rootRef' "$out" 2>/dev/null)"
+    if [ -n "$root_ref" ] && [ "$root_ref" != "null" ] \
+        && [ "$(jq --arg r "$root_ref" '.dependencies[] | select(.ref==$r) | .dependsOn | index("pkg:npm/lodash@4.17.21") != null' "$out" 2>/dev/null)" = "true" ]; then
+        pass "emits dependency graph (rootRef dependsOn lodash)"
+    else
+        fail "dependency graph missing/incorrect"; jq '{rootRef: .metadata.rootRef, dependencies}' "$out" 2>/dev/null
+    fi
 else
     fail "generation run exited non-zero"; cat /tmp/gen.log
 fi

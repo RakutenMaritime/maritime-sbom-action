@@ -75,6 +75,16 @@ echo "=========================================="
 echo " generate action test suite"
 echo "=========================================="
 
+# ---- Unit tests: jq transform (no Docker required) ------------------------
+# Run first so the conversion logic is verified even when the Docker build is
+# unavailable (e.g. restricted networks).
+echo "▶ jq transform unit tests"
+if bash "$ACTION_DIR/tests/jq-tests.sh" >/tmp/jq-tests.log 2>&1; then
+    pass "jq transform unit tests ($(grep -c 'PASS' /tmp/jq-tests.log) checks)"
+else
+    fail "jq transform unit tests"; cat /tmp/jq-tests.log
+fi
+
 # ---- Build ----------------------------------------------------------------
 if [ "${SKIP_BUILD:-}" = "1" ]; then
     echo "▶ Skipping build, using image: $IMAGE"

@@ -82,8 +82,10 @@ GENERATED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 ACTION_VERSION="${GITHUB_ACTION_REF:-}"
 
 # Flatten the CycloneDX document into a plain JSON dependency list and attach
-# the source metadata.
+# the source metadata. The jq transform lives in a sibling file so it can be
+# unit-tested without Docker (see tests/jq-tests.sh).
 echo "🔄 Converting to a plain JSON dependency list..."
+JQ_FILTER="$(dirname "$0")/to-plain-sbom.jq"
 jq \
   --arg repository "$REPO" \
   --arg repositoryUrl "$REPO_URL" \
@@ -98,64 +100,8 @@ jq \
   --arg tags "$TAGS" \
   --arg actionVersion "$ACTION_VERSION" \
   --arg generatedAt "$GENERATED_AT" \
-  '
-  def orNull: if . == "" then null else . end;
-  # ref -> [direct dependency refs], built from the CycloneDX dependency graph.
-  (.dependencies // [] | map({ key: .ref, value: (.dependsOn // []) }) | from_entries) as $deps
-  # Ref of the scanned project itself (the graph root).
-  | (.metadata.component."bom-ref" // .metadata.component.purl) as $rootRef
-  | {
-    metadata: ({
-      repository: ($repository | orNull),
-      repositoryUrl: ($repositoryUrl | orNull),
-      ref: ($ref | orNull),
-      branch: ($branch | orNull),
-      commit: ($commit | orNull),
-      commitMessage: ($commitMessage | orNull),
-      commitAuthor: ($commitAuthor | orNull),
-      commitDate: ($commitDate | orNull),
-      parentCommit: ($parentCommit | orNull),
-      parentCommitDate: ($parentDate | orNull),
-      tags: (
-        ($tags | split("\n") | map(select(length > 0)))
-        | if length == 0 then null else . end
-      ),
-      generatedAt: $generatedAt,
-      generator: "cdxgen",
-      actionVersion: ($actionVersion | orNull),
-      # The scanned project itself and the refs it depends on directly, i.e.
-      # the top-level dependencies. Every listed ref is a component below;
-      # transitive dependencies are reached by following the dependsOn of
-      # each component.
-      rootRef: ($rootRef | orNull),
-      directDependencies: (($deps[$rootRef]? // []) | if length == 0 then null else . end)
-    } | with_entries(select(.value != null))),
-    componentCount: ((.components // []) | length),
-    components: [
-      (.components // [])[] | (."bom-ref" // .purl) as $r | {
-        # Stable identifier used to cross-reference dependsOn edges.
-        ref: $r,
-        name,
-        version,
-        purl,
-        type,
-        group: (.group | orNull),
-        # License identifiers: SPDX id, else license name, else an SPDX
-        # expression. Null when cdxgen could not determine any.
-        licenses: (
-          (.licenses // [])
-          | map(.license.id // .license.name // .expression // empty)
-          | if length == 0 then null else . end
-        ),
-        # Supplier/provider of the component, best-effort from CycloneDX
-        # supplier -> publisher -> author.
-        supplier: (.supplier.name // .publisher // .author | orNull),
-        # Direct dependencies of this component (their refs). The full
-        # transitive set is the closure of dependsOn across components.
-        dependsOn: ($deps[$r]? // [])
-      }
-    ]
-  }' "$cdx_tmp" > "$OUTPUT_FILE"
+  -f "$JQ_FILTER" \
+  "$cdx_tmp" > "$OUTPUT_FILE"
 
 rm -f "$cdx_tmp"
 

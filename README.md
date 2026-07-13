@@ -73,37 +73,48 @@ jobs:
     "tags": ["v1.2.3"],
     "generatedAt": "2026-07-08T08:11:45Z",
     "generator": "cdxgen",
-    "rootRef": "pkg:npm/your-app@1.0.0"
+    "rootRef": "pkg:npm/your-app@1.0.0",
+    "directDependencies": ["pkg:npm/a@1.0.0"]
   },
   "componentCount": 2,
   "components": [
     {
-      "ref": "pkg:npm/lodash@4.17.21",
-      "name": "lodash",
-      "version": "4.17.21",
-      "purl": "pkg:npm/lodash@4.17.21",
+      "ref": "pkg:npm/a@1.0.0",
+      "name": "a",
+      "version": "1.0.0",
+      "purl": "pkg:npm/a@1.0.0",
       "type": "library",
       "group": null,
       "licenses": ["MIT"],
-      "supplier": "..."
+      "supplier": "...",
+      "dependsOn": ["pkg:npm/b@2.0.0"]
+    },
+    {
+      "ref": "pkg:npm/b@2.0.0",
+      "name": "b",
+      "version": "2.0.0",
+      "purl": "pkg:npm/b@2.0.0",
+      "type": "library",
+      "group": null,
+      "licenses": ["Apache-2.0"],
+      "supplier": null,
+      "dependsOn": []
     }
-  ],
-  "dependencies": [
-    { "ref": "pkg:npm/your-app@1.0.0", "dependsOn": ["pkg:npm/lodash@4.17.21"] },
-    { "ref": "pkg:npm/lodash@4.17.21", "dependsOn": [] }
   ]
 }
 ```
 
 각 컴포넌트는 **구성요소**(`name`/`type`), **버전**(`version`), **라이선스**
-(`licenses`, SPDX id/name/expression 배열), **공급자**(`supplier`)를 포함합니다.
-`ref`는 의존성 그래프와 상호 참조하기 위한 식별자(주로 purl)입니다. 값이 없으면
-`null`로 유지됩니다.
+(`licenses`, SPDX id/name/expression 배열), **공급자**(`supplier`), 그리고 **직접
+의존성**(`dependsOn`, 이 컴포넌트가 직접 의존하는 다른 컴포넌트의 `ref` 목록)을
+포함합니다. `ref`는 `dependsOn`이 가리키는 식별자(주로 purl)입니다. 값이 없으면
+`null`(목록은 `[]`)로 유지됩니다.
 
-`dependencies`는 CycloneDX **의존성 그래프**(`ref -> dependsOn` 엣지)입니다.
-**전이(transitive) 의존성**은 `rootRef`에서 시작해 `dependsOn`을 따라가며 만들어지는
-그래프의 전이 폐포(transitive closure)로 표현됩니다. `metadata.rootRef`는 스캔 대상
-프로젝트 자신(그래프의 시작점)을 가리킵니다.
+**전이(transitive) 의존성**은 각 컴포넌트의 `dependsOn`을 따라가며 만들어지는
+전이 폐포(transitive closure)로 표현됩니다. 예: `directDependencies`의 `a`에서
+`a.dependsOn = [b]`를 따라가면 프로젝트의 전체 의존성 `{a, b}`가 됩니다.
+`metadata.rootRef`는 스캔 대상 프로젝트 자신을, `metadata.directDependencies`는
+프로젝트가 **직접** 의존하는(최상위) 컴포넌트의 `ref` 목록을 가리킵니다.
 
 `metadata`는 **이 액션을 실행하는 (분석 대상) 저장소**의 정보입니다. 액션 자신의
 저장소가 아니라, 워크플로우가 돌아가는 소비자 repo의 `GITHUB_REPOSITORY`/`GITHUB_SHA`

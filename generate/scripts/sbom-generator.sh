@@ -100,7 +100,11 @@ jq \
   --arg generatedAt "$GENERATED_AT" \
   '
   def orNull: if . == "" then null else . end;
-  {
+  # ref -> [direct dependency refs], built from the CycloneDX dependency graph.
+  (.dependencies // [] | map({ key: .ref, value: (.dependsOn // []) }) | from_entries) as $deps
+  # Ref of the scanned project itself (the graph root).
+  | (.metadata.component."bom-ref" // .metadata.component.purl) as $rootRef
+  | {
     metadata: ({
       repository: ($repository | orNull),
       repositoryUrl: ($repositoryUrl | orNull),
@@ -119,15 +123,18 @@ jq \
       generatedAt: $generatedAt,
       generator: "cdxgen",
       actionVersion: ($actionVersion | orNull),
-      # The root component of the scanned project; the entry point of the
-      # dependency graph below (its ref appears as a "ref" in dependencies).
-      rootRef: (.metadata.component."bom-ref" // .metadata.component.purl | orNull)
+      # The scanned project itself and the refs it depends on directly, i.e.
+      # the top-level dependencies. Every listed ref is a component below;
+      # transitive dependencies are reached by following the dependsOn of
+      # each component.
+      rootRef: ($rootRef | orNull),
+      directDependencies: (($deps[$rootRef] // []) | if length == 0 then null else . end)
     } | with_entries(select(.value != null))),
     componentCount: ((.components // []) | length),
     components: [
-      (.components // [])[] | {
-        # Stable identifier used to cross-reference the dependency graph.
-        ref: (."bom-ref" // .purl),
+      (.components // [])[] | (."bom-ref" // .purl) as $r | {
+        # Stable identifier used to cross-reference dependsOn edges.
+        ref: $r,
         name,
         version,
         purl,
@@ -142,16 +149,10 @@ jq \
         ),
         # Supplier/provider of the component, best-effort from CycloneDX
         # supplier -> publisher -> author.
-        supplier: (.supplier.name // .publisher // .author | orNull)
-      }
-    ],
-    # Dependency graph as CycloneDX ref -> dependsOn edges. Transitive
-    # dependencies are represented by following each ref through the graph:
-    # the transitive closure of dependsOn from rootRef is the full tree.
-    dependencies: [
-      (.dependencies // [])[] | {
-        ref,
-        dependsOn: (.dependsOn // [])
+        supplier: (.supplier.name // .publisher // .author | orNull),
+        # Direct dependencies of this component (their refs). The full
+        # transitive set is the closure of dependsOn across components.
+        dependsOn: ($deps[$r] // [])
       }
     ]
   }' "$cdx_tmp" > "$OUTPUT_FILE"

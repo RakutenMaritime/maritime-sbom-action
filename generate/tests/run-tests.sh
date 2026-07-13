@@ -134,21 +134,28 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     else
         fail "component license missing/incorrect"; jq '.components' "$out" 2>/dev/null
     fi
-    # Every component carries a ref used to cross-reference the dependency graph.
+    # Every component carries ref plus per-component dependsOn/licenses/supplier.
     if [ "$(jq -r '.components[] | select(.name=="lodash") | .ref' "$out" 2>/dev/null)" = "pkg:npm/lodash@4.17.21" ] \
-        && [ "$(jq '[.components[] | select(has("licenses") and has("supplier"))] | length' "$out" 2>/dev/null)" -ge 1 ]; then
-        pass "components expose ref/licenses/supplier fields"
+        && [ "$(jq '[.components[] | select(has("licenses") and has("supplier") and has("dependsOn"))] | length' "$out" 2>/dev/null)" -ge 1 ]; then
+        pass "components expose ref/licenses/supplier/dependsOn fields"
     else
-        fail "component ref/licenses/supplier fields missing"; jq '.components' "$out" 2>/dev/null
+        fail "component ref/licenses/supplier/dependsOn fields missing"; jq '.components' "$out" 2>/dev/null
     fi
-    # Transitive dependencies are represented as a ref -> dependsOn graph, with
-    # the scanned project (rootRef) depending on lodash.
-    root_ref="$(jq -r '.metadata.rootRef' "$out" 2>/dev/null)"
-    if [ -n "$root_ref" ] && [ "$root_ref" != "null" ] \
-        && [ "$(jq --arg r "$root_ref" '.dependencies[] | select(.ref==$r) | .dependsOn | index("pkg:npm/lodash@4.17.21") != null' "$out" 2>/dev/null)" = "true" ]; then
-        pass "emits dependency graph (rootRef dependsOn lodash)"
+    # Dependencies live inside each component as direct dependsOn refs; lodash
+    # is a leaf so its dependsOn is empty. Transitive deps are the closure of
+    # dependsOn across components.
+    if [ "$(jq -c '.components[] | select(.name=="lodash") | .dependsOn' "$out" 2>/dev/null)" = "[]" ]; then
+        pass "component carries direct dependsOn (lodash is a leaf: [])"
     else
-        fail "dependency graph missing/incorrect"; jq '{rootRef: .metadata.rootRef, dependencies}' "$out" 2>/dev/null
+        fail "component dependsOn missing/incorrect"; jq '.components' "$out" 2>/dev/null
+    fi
+    # The scanned project's top-level dependencies are preserved in metadata,
+    # with lodash as a direct dependency.
+    if [ "$(jq -r '.metadata.rootRef' "$out" 2>/dev/null)" != "null" ] \
+        && [ "$(jq '(.metadata.directDependencies // []) | index("pkg:npm/lodash@4.17.21") != null' "$out" 2>/dev/null)" = "true" ]; then
+        pass "records rootRef and directDependencies (project -> lodash)"
+    else
+        fail "rootRef/directDependencies missing/incorrect"; jq '{rootRef: .metadata.rootRef, directDependencies: .metadata.directDependencies}' "$out" 2>/dev/null
     fi
 else
     fail "generation run exited non-zero"; cat /tmp/gen.log

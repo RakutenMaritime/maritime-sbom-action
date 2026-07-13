@@ -9,6 +9,9 @@ sbom.json
 sbom.xml
 *.log
 
+# Test-generated SBOMs kept for inspection
+generate/tests/output/
+
 # IDE
 .vscode/
 .idea/

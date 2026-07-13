@@ -8,6 +8,11 @@
 # Usage:
 #   generate/tests/run-tests.sh                 # build image, then run tests
 #   IMAGE=my:tag SKIP_BUILD=1 generate/tests/run-tests.sh   # reuse an image
+#
+# The SBOM each test generates is normally cleaned up. To inspect it:
+#   - it is always saved under generate/tests/output/ (path printed below)
+#   - set SHOW_SBOM=1 to also pretty-print the generated SBOM to the console
+#   - override the location with OUTPUT_DIR=/some/dir
 
 set -uo pipefail
 
@@ -15,6 +20,23 @@ ACTION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURE="$ACTION_DIR/tests/fixtures/npm-project"
 IMAGE="${IMAGE:-maritime-sbom-generate:test}"
 PLATFORM="${PLATFORM:-linux/amd64}"
+# Where generated SBOMs are kept for inspection after the run.
+OUTPUT_DIR="${OUTPUT_DIR:-$ACTION_DIR/tests/output}"
+mkdir -p "$OUTPUT_DIR"
+
+# save_sbom <sbom-file> <label> -> copy it into OUTPUT_DIR (and print if asked)
+# so results can be reviewed after the WORKDIR is cleaned up.
+save_sbom() {
+    local src=$1 label=$2 dest="$OUTPUT_DIR/$2.json"
+    [ -f "$src" ] || return 0
+    cp "$src" "$dest"
+    echo "   📄 saved SBOM: $dest"
+    if [ "${SHOW_SBOM:-}" = "1" ]; then
+        echo "   ---- $label.json ----"
+        jq . "$dest" 2>/dev/null | sed 's/^/   /'
+        echo "   ---------------------"
+    fi
+}
 
 PASS=0
 FAIL=0
@@ -99,6 +121,7 @@ fi
 echo "▶ Plain JSON SBOM generation"
 if run_generate sbom.json >/tmp/gen.log 2>&1; then
     out="$WORKDIR/sbom.json"
+    save_sbom "$out" "plain"
     if [ -f "$out" ] \
         && [ "$(jq '.componentCount' "$out")" -ge 1 ] \
         && [ "$(jq -r '.components[0].purl' "$out")" = "pkg:npm/lodash@4.17.21" ] \
@@ -197,6 +220,7 @@ if command -v git >/dev/null 2>&1; then
         -v "$GITDIR:/github/workspace" \
         "$IMAGE" . sbom.json >/tmp/git.log 2>&1
     out="$GITDIR/sbom.json"
+    save_sbom "$out" "with-git-metadata"
     parent_sha="$(git -C "$GITDIR" rev-parse HEAD~1)"
     if [ "$(jq -r '.metadata.parentCommit' "$out" 2>/dev/null)" = "$parent_sha" ] \
         && [ "$(jq -r '.metadata.parentCommitDate' "$out" 2>/dev/null)" != "null" ] \
@@ -226,4 +250,6 @@ rm -rf "$WORKDIR"
 echo "=========================================="
 echo " Results: $PASS passed, $FAIL failed"
 echo "=========================================="
+echo " Generated SBOMs saved in: $OUTPUT_DIR"
+echo "   Inspect: jq . \"$OUTPUT_DIR/plain.json\"   (or re-run with SHOW_SBOM=1)"
 [ "$FAIL" -eq 0 ]

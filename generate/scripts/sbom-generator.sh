@@ -128,7 +128,7 @@ jq \
       # transitive dependencies are reached by following the dependsOn of
       # each component.
       rootRef: ($rootRef | orNull),
-      directDependencies: (($deps[$rootRef] // []) | if length == 0 then null else . end)
+      directDependencies: (($deps[$rootRef]? // []) | if length == 0 then null else . end)
     } | with_entries(select(.value != null))),
     componentCount: ((.components // []) | length),
     components: [
@@ -152,7 +152,7 @@ jq \
         supplier: (.supplier.name // .publisher // .author | orNull),
         # Direct dependencies of this component (their refs). The full
         # transitive set is the closure of dependsOn across components.
-        dependsOn: ($deps[$r] // [])
+        dependsOn: ($deps[$r]? // [])
       }
     ]
   }' "$cdx_tmp" > "$OUTPUT_FILE"

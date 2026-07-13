@@ -1,0 +1,13 @@
+# Regression fixture: a Cargo manifest with no Cargo.lock. cdxgen emits
+# components for these deps but leaves metadata.component (the graph root)
+# without a bom-ref/purl, so the flattening jq sees a null rootRef. This
+# reproduced the "Cannot index object with null" crash before the $deps[...]?
+# guards were added.
+[package]
+name = "sbom-regression-cargo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1.0.197"
+clap = "4.5.1"

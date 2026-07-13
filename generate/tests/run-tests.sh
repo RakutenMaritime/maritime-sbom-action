@@ -246,6 +246,32 @@ else
     echo "⏭  Skipping git parentCommit test (git not found)"
 fi
 
+# ---- Test: null graph root ref does not crash the flattener --------------
+# cdxgen leaves metadata.component without a bom-ref/purl for a lockless Cargo
+# manifest, so the flattening jq sees a null rootRef (and components may lack a
+# ref too). Generation must still succeed instead of failing with
+# "Cannot index object with null".
+echo "▶ Null graph root ref (lockless Cargo) is handled"
+CARGO_FIXTURE="$ACTION_DIR/tests/fixtures/cargo-project"
+WORKDIR="$(mktemp -d)"; cp -R "$CARGO_FIXTURE/." "$WORKDIR/"
+if docker run --rm --platform "$PLATFORM" \
+        -v "$WORKDIR:/github/workspace" \
+        "$IMAGE" . sbom.json >/tmp/cargo.log 2>&1; then
+    out="$WORKDIR/sbom.json"
+    save_sbom "$out" "cargo-null-root"
+    # rootRef is legitimately absent here; the point is that we produced a valid
+    # SBOM with a component count and no crash.
+    if [ -f "$out" ] \
+        && jq -e '.componentCount != null and (.components | type) == "array"' "$out" >/dev/null 2>&1; then
+        pass "generates SBOM despite null rootRef (no null-index crash)"
+    else
+        fail "null-rootRef SBOM malformed"; cat /tmp/cargo.log; jq . "$out" 2>/dev/null
+    fi
+else
+    fail "generation crashed on null rootRef"; cat /tmp/cargo.log
+fi
+rm -rf "$WORKDIR"
+
 # ---- Test: missing scan path fails ---------------------------------------
 echo "▶ Missing scan path is rejected"
 if run_generate sbom.json ./does-not-exist >/tmp/missing.log 2>&1; then

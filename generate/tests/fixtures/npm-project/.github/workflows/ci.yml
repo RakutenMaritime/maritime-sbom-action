@@ -1,0 +1,16 @@
+# Present only so the scan has GitHub Actions to find: cdxgen reports the
+# actions a workflow uses as pkg:github/... components, and the SBOM must
+# exclude them (they are the CI environment, not project dependencies).
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: .

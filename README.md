@@ -113,6 +113,11 @@ jobs:
 컴포넌트의 `ref` 목록)을 포함합니다. `ref`는 `dependsOn`이 가리키는 식별자(주로
 purl)입니다. 값이 없으면 `null`(목록은 `[]`)로 유지됩니다.
 
+> 스캔은 `.github/workflows`도 훑기 때문에 cdxgen이 CI가 쓰는 **GitHub Actions**
+> (`actions/checkout` 등, `pkg:github/…` purl)를 컴포넌트로 보고합니다. 이는 빌드
+> 환경이지 프로젝트의 의존성이 아니므로, 컴포넌트 목록과 의존성 그래프
+> (`dependsOn`/`directDependencies`) 양쪽에서 **제외**됩니다.
+
 **전이(transitive) 의존성**은 각 컴포넌트의 `dependsOn`을 따라가며 만들어지는
 전이 폐포(transitive closure)로 표현됩니다. 예: `directDependencies`의 `a`에서
 `a.dependsOn = [b]`를 따라가면 프로젝트의 전체 의존성 `{a, b}`가 됩니다.

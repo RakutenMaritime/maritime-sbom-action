@@ -8,11 +8,27 @@
 
 def orNull: if . == "" then null else . end;
 
+# The recursive scan also reads .github/workflows, so cdxgen reports the
+# GitHub Actions the CI uses (pkg:github/...) as components — e.g.
+# actions/checkout, and this action itself. Those describe the build
+# environment, not the scanned project's dependencies, so they are dropped
+# from the component list and from the dependency graph.
+def isCiComponent: ((.purl // "") | startswith("pkg:github/"));
+
+# Refs of the dropped CI components, as a set for membership lookup.
+([ (.components // [])[] | select(isCiComponent) | (."bom-ref" // .purl) | select(. != null) ]
+  | map({ key: ., value: true })
+  | from_entries) as $ciRefs
+# The scanned project's real components, CI actions removed.
+| ((.components // []) | map(select(isCiComponent | not))) as $comps
 # ref -> [direct dependency refs], built from the CycloneDX dependency graph.
 # Drop edges with a null/absent ref so from_entries never sees a null key
-# (cdxgen can emit these for unresolved nodes in some scans).
-(.dependencies // []
-  | map(select(.ref != null) | { key: .ref, value: (.dependsOn // []) })
+# (cdxgen can emit these for unresolved nodes in some scans), and drop any
+# dependsOn pointing at a removed CI component.
+| (.dependencies // []
+  | map(select(.ref != null)
+    | { key: .ref,
+        value: ((.dependsOn // []) | map(select(. != null)) | map(select($ciRefs[.] | not))) })
   | from_entries) as $deps
 # Ref of the scanned project itself (the graph root). May be null when
 # cdxgen omits metadata.component; indexing $deps with it is guarded below.
@@ -43,9 +59,9 @@ def orNull: if . == "" then null else . end;
     rootRef: ($rootRef | orNull),
     directDependencies: (($deps[$rootRef]? // []) | if length == 0 then null else . end)
   } | with_entries(select(.value != null))),
-  componentCount: ((.components // []) | length),
+  componentCount: ($comps | length),
   components: [
-    (.components // [])[] | (."bom-ref" // .purl) as $r | {
+    $comps[] | (."bom-ref" // .purl) as $r | {
       # Stable identifier used to cross-reference dependsOn edges.
       ref: $r,
       name,

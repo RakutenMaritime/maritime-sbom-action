@@ -167,6 +167,14 @@ if run_generate sbom.json >/tmp/gen.log 2>&1; then
     else
         fail "component license missing/incorrect"; jq '.components' "$out" 2>/dev/null
     fi
+    # The fixture ships a .github/workflows file, so cdxgen finds the actions
+    # it uses. They describe the CI environment and must not reach the SBOM.
+    if [ "$(jq '[.components[] | select(.purl | startswith("pkg:github/"))] | length' "$out" 2>/dev/null)" = "0" ] \
+        && [ "$(jq '[.metadata.directDependencies // [] | .[] | select(startswith("pkg:github/"))] | length' "$out" 2>/dev/null)" = "0" ]; then
+        pass "excludes GitHub Actions (CI environment) from the SBOM"
+    else
+        fail "GitHub Actions leaked into the SBOM"; jq '[.components[] | .purl]' "$out" 2>/dev/null
+    fi
     # Component content hash is carried through as { alg, content }.
     if [ "$(jq -r '.components[] | select(.name=="lodash") | .hashes[0].alg' "$out" 2>/dev/null)" = "SHA-512" ] \
         && [ -n "$(jq -r '.components[] | select(.name=="lodash") | .hashes[0].content // empty' "$out" 2>/dev/null)" ]; then

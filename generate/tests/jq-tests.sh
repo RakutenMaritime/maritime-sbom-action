@@ -82,6 +82,33 @@ check "transitive dependsOn edge"      '.components[]|select(.name=="strip-ansi"
 check "leaf dependsOn is []"           '.components[]|select(.name=="ansi-regex").dependsOn' '[]'
 check "no top-level dependencies key"  'has("dependencies")' 'false'
 
+# ---- GitHub Actions (CI environment) are excluded ------------------------
+# cdxgen's recursive scan reads .github/workflows and reports the actions the
+# CI uses as pkg:github/... components. Those must not appear in the SBOM.
+CI_DOC='{
+  "metadata": { "component": { "bom-ref": "pkg:cargo/app@1.0.0", "purl": "pkg:cargo/app@1.0.0" } },
+  "components": [
+    { "bom-ref": "pkg:github/actions/checkout@v5", "name": "checkout", "version": "v5", "purl": "pkg:github/actions/checkout@v5", "type": "application" },
+    { "bom-ref": "pkg:github/RakutenMaritime%2Fmaritime-sbom-action%2Fgenerate@v2.2", "name": "generate", "version": "v2.2", "purl": "pkg:github/RakutenMaritime%2Fmaritime-sbom-action%2Fgenerate@v2.2", "type": "application" },
+    { "bom-ref": "pkg:cargo/spi@0.1.0", "name": "spi", "version": "0.1.0", "purl": "pkg:cargo/spi@0.1.0", "type": "library" }
+  ],
+  "dependencies": [
+    { "ref": "pkg:cargo/app@1.0.0", "dependsOn": ["pkg:cargo/spi@0.1.0", "pkg:github/actions/checkout@v5"] },
+    { "ref": "pkg:cargo/spi@0.1.0", "dependsOn": ["pkg:github/actions/checkout@v5"] },
+    { "ref": "pkg:github/actions/checkout@v5", "dependsOn": [] }
+  ]
+}'
+CI_OUT="$(transform "$CI_DOC")"
+ci_check() { # <name> <jq-expr> <expected>
+    local got; got="$(printf '%s' "$CI_OUT" | jq -c "$2" 2>/dev/null)"
+    if [ "$got" = "$3" ]; then pass "$1"; else fail "$1 (got $got, want $3)"; fi
+}
+ci_check "drops pkg:github components"        '[.components[]|select(.purl|startswith("pkg:github/"))]|length' '0'
+ci_check "keeps real (cargo) component"       '[.components[]|.name]' '["spi"]'
+ci_check "componentCount excludes CI actions" '.componentCount' '1'
+ci_check "directDependencies excludes CI"     '.metadata.directDependencies' '["pkg:cargo/spi@0.1.0"]'
+ci_check "dependsOn drops CI refs"            '.components[]|select(.name=="spi").dependsOn' '[]'
+
 echo "=========================================="
 echo " Results: $PASS passed, $FAIL failed"
 echo "=========================================="

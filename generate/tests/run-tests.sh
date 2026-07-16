@@ -297,6 +297,38 @@ else
 fi
 rm -rf "$WORKDIR"
 
+# ---- Test: Maven dependencies are found without a JDK/maven --------------
+# The image deliberately ships no JDK or maven, so cdxgen cannot run `mvn` and
+# falls back to parsing pom.xml. cdxgen 11.4.3 reported "0 components" from that
+# fallback, which left every Java project with an empty SBOM; 12.x reports the
+# declared dependencies. This pins the cdxgen version floor.
+echo "▶ Maven project reports its declared dependencies (no JDK/maven present)"
+MAVEN_FIXTURE="$ACTION_DIR/tests/fixtures/maven-project"
+WORKDIR="$(mktemp -d)"; cp -R "$MAVEN_FIXTURE/." "$WORKDIR/"
+if docker run --rm --platform "$PLATFORM" \
+        -v "$WORKDIR:/github/workspace" \
+        "$IMAGE" . sbom.json >/tmp/maven.log 2>&1; then
+    out="$WORKDIR/sbom.json"
+    save_sbom "$out" "maven"
+    if [ "$(jq -c '[.components[].name] | sort' "$out" 2>/dev/null)" \
+            = '["commons-lang3","guava","jackson-databind","junit"]' ]; then
+        pass "reports pom.xml dependencies (guava, commons-lang3, jackson-databind, junit)"
+    else
+        fail "maven dependencies missing/incorrect"; jq -c '[.components[].purl]' "$out" 2>/dev/null
+        grep -iE "not found|fallback|0 components" /tmp/maven.log | head -3
+    fi
+    # The toolchain must never leak in: only the project's own dependencies.
+    if jq -e '[.components[].purl | select(test("jdk|openjdk|alpine|pkg:apk|pkg:npm"))] | length == 0' \
+            "$out" >/dev/null 2>&1; then
+        pass "no build-environment components leak into the Maven SBOM"
+    else
+        fail "environment components leaked"; jq -c '[.components[].purl]' "$out" 2>/dev/null
+    fi
+else
+    fail "generation failed on the maven fixture"; cat /tmp/maven.log
+fi
+rm -rf "$WORKDIR"
+
 # ---- Test: missing scan path fails ---------------------------------------
 echo "▶ Missing scan path is rejected"
 if run_generate sbom.json ./does-not-exist >/tmp/missing.log 2>&1; then

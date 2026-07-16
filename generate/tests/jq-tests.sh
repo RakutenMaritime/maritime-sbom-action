@@ -109,6 +109,77 @@ ci_check "componentCount excludes CI actions" '.componentCount' '1'
 ci_check "directDependencies excludes CI"     '.metadata.directDependencies' '["pkg:cargo/spi@0.1.0"]'
 ci_check "dependsOn drops CI refs"            '.components[]|select(.name=="spi").dependsOn' '[]'
 
+# ---- The scanned project is not one of its own dependencies --------------
+# CycloneDX records the root in metadata.component, but cdxgen's Cargo parser
+# also repeats it in components[]. It must not be reported as a dependency.
+ROOT_DOC='{
+  "metadata": { "component": { "bom-ref": "pkg:cargo/spi@0.1.0", "purl": "pkg:cargo/spi@0.1.0" } },
+  "components": [
+    { "bom-ref": "pkg:cargo/spi@0.1.0", "name": "spi", "version": "0.1.0", "purl": "pkg:cargo/spi@0.1.0", "type": "library" },
+    { "bom-ref": "pkg:cargo/serde@1.0.197", "name": "serde", "version": "1.0.197", "purl": "pkg:cargo/serde@1.0.197", "type": "library" }
+  ],
+  "dependencies": [
+    { "ref": "pkg:cargo/spi@0.1.0", "dependsOn": ["pkg:cargo/serde@1.0.197"] },
+    { "ref": "pkg:cargo/serde@1.0.197", "dependsOn": [] }
+  ]
+}'
+ROOT_OUT="$(transform "$ROOT_DOC")"
+root_check() { # <name> <jq-expr> <expected>
+    local got; got="$(printf '%s' "$ROOT_OUT" | jq -c "$2" 2>/dev/null)"
+    if [ "$got" = "$3" ]; then pass "$1"; else fail "$1 (got $got, want $3)"; fi
+}
+root_check "root is not listed as a component"  '[.components[]|.name]' '["serde"]'
+root_check "componentCount excludes the root"   '.componentCount' '1'
+root_check "rootRef still recorded in metadata" '.metadata.rootRef' '"pkg:cargo/spi@0.1.0"'
+root_check "directDependencies unaffected"      '.metadata.directDependencies' '["pkg:cargo/serde@1.0.197"]'
+
+# ---- Unresolved scan reports no dependencies -----------------------------
+# cdxgen named no root component AND emitted no dependency edges: nothing was
+# resolved. This is the lockless-Cargo shape — the crate itself (and any
+# unresolved manifest ranges) is all cdxgen produced, so the crate would
+# otherwise be reported as its own dependency. Expect "no dependencies".
+UNRESOLVED_DOC='{
+  "components": [
+    { "bom-ref": "pkg:cargo/spi@0.1.0", "name": "spi", "version": "0.1.0", "purl": "pkg:cargo/spi@0.1.0", "type": "library" },
+    { "bom-ref": "pkg:github/actions/checkout@v5", "name": "checkout", "version": "v5", "purl": "pkg:github/actions/checkout@v5", "type": "application" }
+  ],
+  "dependencies": []
+}'
+UNRESOLVED_OUT="$(transform "$UNRESOLVED_DOC")"
+u_check() { # <name> <jq-expr> <expected>
+    local got; got="$(printf '%s' "$UNRESOLVED_OUT" | jq -c "$2" 2>/dev/null)"
+    if [ "$got" = "$3" ]; then pass "$1"; else fail "$1 (got $got, want $3)"; fi
+}
+u_check "unresolved scan reports no components" '.components' '[]'
+u_check "unresolved scan componentCount is 0"   '.componentCount' '0'
+u_check "unresolved scan has no rootRef"        '.metadata.rootRef' 'null'
+
+# A null rootRef alone must NOT empty the list: when cdxgen did resolve
+# dependency edges, the components are real and must survive.
+PARTIAL_DOC='{
+  "components": [{ "bom-ref": "pkg:npm/x@1", "name": "x", "version": "1", "purl": "pkg:npm/x@1" }],
+  "dependencies": [{ "ref": "pkg:npm/x@1", "dependsOn": [] }]
+}'
+got="$(transform "$PARTIAL_DOC" | jq -c '[.components[]|.name]' 2>/dev/null)"
+if [ "$got" = '["x"]' ]; then
+    pass "null rootRef with real dependency edges keeps components"
+else
+    fail "null rootRef with edges dropped components (got $got, want [\"x\"])"
+fi
+
+# Go resolves a root from go.mod with no go.sum present: the document names a
+# root, so it must never be treated as unresolved.
+got="$(transform '{
+  "metadata": { "component": { "bom-ref": "pkg:golang/github.com/rakuten/spi", "purl": "pkg:golang/github.com/rakuten/spi" } },
+  "components": [{ "bom-ref": "pkg:golang/github.com/pkg/errors@v0.9.1", "name": "errors", "version": "v0.9.1", "purl": "pkg:golang/github.com/pkg/errors@v0.9.1" }],
+  "dependencies": []
+}' | jq -c '[.components[]|.name]' 2>/dev/null)"
+if [ "$got" = '["errors"]' ]; then
+    pass "lockfile-less Go project (root named, no edges) keeps components"
+else
+    fail "Go project without go.sum was blanked (got $got, want [\"errors\"])"
+fi
+
 echo "=========================================="
 echo " Results: $PASS passed, $FAIL failed"
 echo "=========================================="

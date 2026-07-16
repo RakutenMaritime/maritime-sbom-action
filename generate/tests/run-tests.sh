@@ -271,12 +271,17 @@ else
     echo "⏭  Skipping git parentCommit test (git not found)"
 fi
 
-# ---- Test: null graph root ref does not crash the flattener --------------
+# ---- Test: lockless Cargo reports no dependencies ------------------------
 # cdxgen leaves metadata.component without a bom-ref/purl for a lockless Cargo
 # manifest, so the flattening jq sees a null rootRef (and components may lack a
 # ref too). Generation must still succeed instead of failing with
 # "Cannot index object with null".
-echo "▶ Null graph root ref (lockless Cargo) is handled"
+#
+# It must also report no dependencies. With no Cargo.lock cdxgen resolves no
+# graph (no root component, no dependency edges) and falls back to Cargo.toml,
+# listing the scanned crate ITSELF plus unresolved manifest ranges — which is
+# how a crate ended up reported as its own dependency.
+echo "▶ Lockless Cargo reports no dependencies (and does not crash)"
 CARGO_FIXTURE="$ACTION_DIR/tests/fixtures/cargo-project"
 WORKDIR="$(mktemp -d)"; cp -R "$CARGO_FIXTURE/." "$WORKDIR/"
 if docker run --rm --platform "$PLATFORM" \
@@ -291,6 +296,20 @@ if docker run --rm --platform "$PLATFORM" \
         pass "generates SBOM despite null rootRef (no null-index crash)"
     else
         fail "null-rootRef SBOM malformed"; cat /tmp/cargo.log; jq . "$out" 2>/dev/null
+    fi
+    # The crate itself (sbom-regression-cargo, from the fixture's [package])
+    # must never be reported as one of its own dependencies.
+    if jq -e '[.components[]? | select(.name == "sbom-regression-cargo")] | length == 0' \
+            "$out" >/dev/null 2>&1; then
+        pass "does not report the scanned crate as its own dependency"
+    else
+        fail "scanned crate leaked into its own SBOM"; jq -c '[.components[].name]' "$out" 2>/dev/null
+    fi
+    # Nothing was resolved -> no dependencies reported.
+    if [ "$(jq -r '.componentCount' "$out" 2>/dev/null)" = "0" ]; then
+        pass "lockless Cargo reports zero components"
+    else
+        fail "lockless Cargo reported components"; jq -c '[.components[].purl]' "$out" 2>/dev/null
     fi
 else
     fail "generation crashed on null rootRef"; cat /tmp/cargo.log

@@ -15,12 +15,34 @@ def orNull: if . == "" then null else . end;
 # from the component list and from the dependency graph.
 def isCiComponent: ((.purl // "") | startswith("pkg:github/"));
 
+# Ref of the scanned project itself (the graph root). May be null when cdxgen
+# omits metadata.component; every use below is guarded for that.
+(.metadata.component."bom-ref" // .metadata.component.purl) as $rootRef
+# cdxgen resolved no dependency graph at all: it named no root component AND
+# emitted no dependency edges. Most ecosystems already report nothing in that
+# situation — without a lockfile the npm and Python parsers return an empty
+# component list, and Go still resolves a root from go.mod, so none of them
+# reach this branch with real data. cdxgen's Cargo parser is the outlier: it
+# falls back to Cargo.toml and lists the scanned crate ITSELF (plus unresolved
+# manifest ranges), which is how a dependency-less crate ended up reported as
+# its own dependency. Normalise that to what it is — no dependencies — without
+# special-casing any ecosystem. Note this reads the document, not the
+# filesystem: probing for lockfiles by name would wrongly blank a Go project
+# that legitimately resolves from go.mod alone (no go.sum).
+| ($rootRef == null and ((.dependencies // []) | length == 0)) as $unresolved
 # Refs of the dropped CI components, as a set for membership lookup.
-([ (.components // [])[] | select(isCiComponent) | (."bom-ref" // .purl) | select(. != null) ]
+| ([ (.components // [])[] | select(isCiComponent) | (."bom-ref" // .purl) | select(. != null) ]
   | map({ key: ., value: true })
   | from_entries) as $ciRefs
-# The scanned project's real components, CI actions removed.
-| ((.components // []) | map(select(isCiComponent | not))) as $comps
+# The scanned project's real dependencies: CI actions removed, and the scanned
+# project itself removed — CycloneDX records the root in metadata.component, but
+# cdxgen's Cargo parser also repeats it in components[], and a project is not
+# its own dependency.
+| (if $unresolved then []
+   else (.components // [])
+     | map(select((isCiComponent | not)
+       and (($rootRef == null) or ((."bom-ref" // .purl) != $rootRef))))
+   end) as $comps
 # ref -> [direct dependency refs], built from the CycloneDX dependency graph.
 # Drop edges with a null/absent ref so from_entries never sees a null key
 # (cdxgen can emit these for unresolved nodes in some scans), and drop any
@@ -30,9 +52,6 @@ def isCiComponent: ((.purl // "") | startswith("pkg:github/"));
     | { key: .ref,
         value: ((.dependsOn // []) | map(select(. != null)) | map(select($ciRefs[.] | not))) })
   | from_entries) as $deps
-# Ref of the scanned project itself (the graph root). May be null when
-# cdxgen omits metadata.component; indexing $deps with it is guarded below.
-| (.metadata.component."bom-ref" // .metadata.component.purl) as $rootRef
 | {
   metadata: ({
     repository: ($repository | orNull),

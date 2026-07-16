@@ -118,6 +118,16 @@ purl)입니다. 값이 없으면 `null`(목록은 `[]`)로 유지됩니다.
 > 환경이지 프로젝트의 의존성이 아니므로, 컴포넌트 목록과 의존성 그래프
 > (`dependsOn`/`directDependencies`) 양쪽에서 **제외**됩니다.
 
+> 스캔 대상 프로젝트 자신은 `metadata.rootRef`로만 기록되고 `components`에는
+> **포함되지 않습니다** — 자기 자신은 자신의 의존성이 아닙니다.
+
+> cdxgen이 의존성을 전혀 해석하지 못한 경우(루트도 지목 못 하고 의존성 간선도
+> 없는 경우) **의존성 없음**(`componentCount: 0`)으로 보고합니다. 대표적으로
+> `Cargo.lock` 없는 Rust 프로젝트가 여기 해당합니다 — 이때 cdxgen의 Cargo
+> 파서만 유일하게 `Cargo.toml`로 폴백해 **크레이트 자신**과 미해결 버전 범위를
+> 나열하기 때문에, 그대로 두면 프로젝트가 자기 자신에 의존하는 것으로 나옵니다.
+> 의존성을 SBOM에 담으려면 **lock 파일을 커밋하세요.**
+
 **전이(transitive) 의존성**은 각 컴포넌트의 `dependsOn`을 따라가며 만들어지는
 전이 폐포(transitive closure)로 표현됩니다. 예: `directDependencies`의 `a`에서
 `a.dependsOn = [b]`를 따라가면 프로젝트의 전체 의존성 `{a, b}`가 됩니다.

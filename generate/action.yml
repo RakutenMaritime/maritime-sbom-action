@@ -14,7 +14,7 @@ inputs:
   recurse:
     description: 'Recurse into subdirectories (mono-repos). Set to false to scan only the top level.'
     required: false
-    default: 'true'
+    default: 'false'
 
 outputs:
   sbom-file:

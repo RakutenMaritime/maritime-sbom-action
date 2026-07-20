@@ -4,7 +4,7 @@ set -e
 
 SCAN_PATH="${1:-.}"
 OUTPUT_FILE="${2:-sbom.json}"
-RECURSE="${3:-true}"
+RECURSE="${3:-false}"
 
 # Check if scan path exists
 if [ ! -d "$SCAN_PATH" ]; then

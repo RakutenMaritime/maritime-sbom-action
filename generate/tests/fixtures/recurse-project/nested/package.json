@@ -1,0 +1,8 @@
+{
+  "name": "sbom-recurse-nested",
+  "version": "1.0.0",
+  "license": "MIT",
+  "dependencies": {
+    "ansi-regex": "^5.0.1"
+  }
+}

@@ -329,6 +329,43 @@ else
 fi
 rm -rf "$WORKDIR"
 
+# ---- Test: the recurse arg toggles mono-repo recursion -------------------
+# The fixture declares lodash at the root and ansi-regex in nested/. With
+# recursion on (the default) both are found; with recursion off only the
+# top-level lodash is. The third positional arg is the `recurse` action input.
+echo "▶ recurse arg controls whether nested projects are scanned"
+RECURSE_FIXTURE="$ACTION_DIR/tests/fixtures/recurse-project"
+
+WORKDIR="$(mktemp -d)"; cp -R "$RECURSE_FIXTURE/." "$WORKDIR/"
+if docker run --rm --platform "$PLATFORM" \
+        -v "$WORKDIR:/github/workspace" \
+        "$IMAGE" . sbom.json true >/tmp/recurse-on.log 2>&1; then
+    out="$WORKDIR/sbom.json"; save_sbom "$out" "recurse-on"
+    if [ "$(jq -c '[.components[].name] | sort' "$out" 2>/dev/null)" = '["ansi-regex","lodash"]' ]; then
+        pass "recurse=true scans nested projects (lodash + ansi-regex)"
+    else
+        fail "recurse=true did not find nested deps"; jq -c '[.components[].name]' "$out" 2>/dev/null
+    fi
+else
+    fail "generation failed with recurse=true"; cat /tmp/recurse-on.log
+fi
+rm -rf "$WORKDIR"
+
+WORKDIR="$(mktemp -d)"; cp -R "$RECURSE_FIXTURE/." "$WORKDIR/"
+if docker run --rm --platform "$PLATFORM" \
+        -v "$WORKDIR:/github/workspace" \
+        "$IMAGE" . sbom.json false >/tmp/recurse-off.log 2>&1; then
+    out="$WORKDIR/sbom.json"; save_sbom "$out" "recurse-off"
+    if [ "$(jq -c '[.components[].name] | sort' "$out" 2>/dev/null)" = '["lodash"]' ]; then
+        pass "recurse=false scans only the top level (lodash, no ansi-regex)"
+    else
+        fail "recurse=false still scanned nested deps"; jq -c '[.components[].name]' "$out" 2>/dev/null
+    fi
+else
+    fail "generation failed with recurse=false"; cat /tmp/recurse-off.log
+fi
+rm -rf "$WORKDIR"
+
 # ---- Test: missing scan path fails ---------------------------------------
 echo "▶ Missing scan path is rejected"
 if run_generate sbom.json ./does-not-exist >/tmp/missing.log 2>&1; then

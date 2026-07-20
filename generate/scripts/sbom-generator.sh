@@ -4,6 +4,7 @@ set -e
 
 SCAN_PATH="${1:-.}"
 OUTPUT_FILE="${2:-sbom.json}"
+RECURSE="${3:-true}"
 
 # Check if scan path exists
 if [ ! -d "$SCAN_PATH" ]; then
@@ -11,7 +12,15 @@ if [ ! -d "$SCAN_PATH" ]; then
     exit 1
 fi
 
-echo "📦 Analyzing dependencies in $SCAN_PATH with cdxgen..."
+# Recurse into subdirectories (mono-repos) unless the caller opts out. cdxgen
+# recurses by default; --no-recurse limits the scan to the top level. Anything
+# other than a false-y value keeps the default recursive behaviour.
+case "$(printf '%s' "$RECURSE" | tr '[:upper:]' '[:lower:]')" in
+    false | no | 0 | off) RECURSE_FLAG="--no-recurse" ;;
+    *)                     RECURSE_FLAG="--recurse" ;;
+esac
+
+echo "📦 Analyzing dependencies in $SCAN_PATH with cdxgen ($RECURSE_FLAG)..."
 
 # Generate a CycloneDX SBOM with cdxgen.
 # --no-install-deps keeps the scan deterministic and offline: cdxgen relies on
@@ -19,7 +28,7 @@ echo "📦 Analyzing dependencies in $SCAN_PATH with cdxgen..."
 cdx_tmp="$(mktemp)"
 cdxgen \
     --no-install-deps \
-    --recurse \
+    "$RECURSE_FLAG" \
     --project-name "$(basename "$(cd "$SCAN_PATH" && pwd)")" \
     --output "$cdx_tmp" \
     "$SCAN_PATH"

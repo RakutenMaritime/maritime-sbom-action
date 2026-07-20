@@ -5,13 +5,15 @@ set -e
 # Script behavior
 SCAN_PATH="${1:-.}"
 OUTPUT_FILE="${2:-sbom.json}"
+RECURSE="${3:-true}"
 
 echo "🔍 Starting SBOM generation..."
 echo "  Scan Path: $SCAN_PATH"
 echo "  Output File: $OUTPUT_FILE"
+echo "  Recurse: $RECURSE"
 
 # Call the SBOM generator script
-/opt/sbom/scripts/sbom-generator.sh "$SCAN_PATH" "$OUTPUT_FILE"
+/opt/sbom/scripts/sbom-generator.sh "$SCAN_PATH" "$OUTPUT_FILE" "$RECURSE"
 
 if [ ! -f "$OUTPUT_FILE" ]; then
     echo "❌ Failed to generate SBOM"

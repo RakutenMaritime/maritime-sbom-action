@@ -29,6 +29,7 @@ jobs:
         with:
           scan-path: '.'           # 스캔 경로 (default: .)
           output-file: 'sbom.json' # 출력 파일 경로 (default: sbom.json)
+          recurse: 'true'          # 하위 디렉토리까지 재귀 스캔 (default: true)
 
       - name: Display SBOM
         run: cat ${{ steps.sbom.outputs.sbom-file }}
@@ -138,6 +139,7 @@ purl)입니다. 값이 없으면 `null`(목록은 `[]`)로 유지됩니다.
 |-------|-------------|---------|
 | `scan-path` | 스캔할 경로 | `.` |
 | `output-file` | 출력 파일 경로 | `sbom.json` |
+| `recurse` | 하위 디렉토리(모노레포)까지 재귀 스캔. `false`면 최상위만 스캔 | `true` |
 
 | Output | Description |
 |--------|-------------|

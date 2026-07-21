@@ -12,13 +12,16 @@ Action 모음입니다. 두 개의 액션으로 구성됩니다.
 
 ### 릴리스별 workflow 생성 및 S3 배포
 
-`.github/workflows/publish-sbom-workflow.yml`은 GitHub Release가 발행될 때
-`.github/templates/sbom-generation.yml.tpl`의 `{{version}}`을 release tag로 치환해
-`sbom-generation.yml`을 생성한 후 S3의 고정 key에 업로드합니다. 같은 key에
-업로드하므로 새 release가 발행될 때마다 파일이 최신 태그로 업데이트됩니다.
+`.github/workflows/publish-sbom-workflow.yml`을 수동 실행하면
+`.github/templates/sbom-generation.yml.tpl`의 `{{version}}`을 입력한 release tag로
+치환해 `sbom-generation.yml`을 생성한 후 S3의 고정 key에 업로드합니다. 같은 key에
+업로드하므로 workflow를 실행할 때마다 파일이 입력한 태그로 업데이트됩니다.
 
-정식 release는 `prod`, prerelease는 `dev` GitHub Environment를 자동으로 사용합니다.
-수동 실행(`workflow_dispatch`)에서는 release tag와 `dev`/`prod`를 직접 선택할 수
+수동 실행 시 입력한 `release-tag`는 workflow를 실행한 커밋에 annotated Git tag로
+생성되어 원격 저장소에 push됩니다. 동일 태그가 같은 커밋에 이미 존재하면 그대로
+재사용하며, 다른 커밋에 존재하면 workflow가 실패합니다.
+
+수동 실행(`workflow_dispatch`)에서 release tag와 `dev`/`prod`를 직접 선택할 수
 있습니다. 각 Environment에 다음 값을 등록하세요.
 
 Repository의 Actions variables에 `DEV_S3_NAME`과 `PROD_S3_NAME`을 서로 다른

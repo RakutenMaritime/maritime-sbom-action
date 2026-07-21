@@ -11,6 +11,10 @@ inputs:
     description: 'Output file path for the SBOM'
     required: false
     default: 'sbom.json'
+  recurse:
+    description: 'Recurse into subdirectories (mono-repos). Set to false to scan only the top level.'
+    required: false
+    default: 'false'
 
 outputs:
   sbom-file:
@@ -22,3 +26,4 @@ runs:
   args:
     - ${{ inputs.scan-path }}
     - ${{ inputs.output-file }}
+    - ${{ inputs.recurse }}

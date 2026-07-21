@@ -1,8 +1,6 @@
 name: Publish SBOM workflow
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       release-tag:
@@ -24,14 +22,14 @@ permissions:
 
 jobs:
   publish:
-    name: Publish workflow to ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'dev' || 'prod') }} S3
+    name: Publish workflow to ${{ github.event_name == 'workflow_dispatch' && inputs.environment }} S3
     runs-on: ubuntu-latest
     # Published prereleases go to dev and normal releases go to prod.
     # A manual run uses the explicitly selected Environment.
-    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'dev' || 'prod') }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment }}
     env:
-      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'dev' || 'prod') }}
-      RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release-tag }}
+      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment }}
+      RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name }}
       DEV_S3_NAME: ${{ vars.DEV_S3_NAME }}
       PROD_S3_NAME: ${{ vars.PROD_S3_NAME }}
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2'}}

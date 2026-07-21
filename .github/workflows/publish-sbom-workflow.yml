@@ -29,6 +29,9 @@ jobs:
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment }}
     env:
       DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment }}
+      RELEASE_TAG: ${{ inputs['release-tag'] }}
+      DEV_S3_NAME: ${{ secrets.DEV_S3_NAME }}
+      PROD_S3_NAME: ${{ secrets.PROD_S3_NAME }}
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2'}}
       S3_KEY: ${{ vars.SBOM_WORKFLOW_S3_KEY || 'sbom-workflow/sbom.yml' }}
     steps:
@@ -38,13 +41,17 @@ jobs:
       - name: Generate versioned workflow
         shell: bash
         run: |
+          if [ -z "$RELEASE_TAG" ]; then
+            echo 'release-tag input is required'
+            exit 1
+          fi
           if [[ ! "$RELEASE_TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
             echo "Invalid release tag: $RELEASE_TAG"
             exit 1
           fi
           sed "s/{{version}}/${RELEASE_TAG}/g" \
             .github/templates/sbom-generation.yml.tpl > sbom-generation.yml
-          grep -q "@${RELEASE_TAG}" sbom-generation.yml
+          grep -Fq "@${RELEASE_TAG}" sbom-generation.yml
           if grep -q '{{version}}' sbom-generation.yml; then
             echo 'Version placeholder was not fully replaced'
             exit 1
@@ -57,9 +64,9 @@ jobs:
         shell: bash
         run: |
           if [ "$DEPLOY_ENV" = "dev" ]; then
-            selected_s3_name=${{ secrets.DEV_S3_NAME }}
+            selected_s3_name="$DEV_S3_NAME"
           elif [ "$DEPLOY_ENV" = "prod" ]; then
-            selected_s3_name=${{ secrets.PROD_S3_NAME }}
+            selected_s3_name="$PROD_S3_NAME"
           else
             echo "Unsupported environment: $DEPLOY_ENV"
             exit 1

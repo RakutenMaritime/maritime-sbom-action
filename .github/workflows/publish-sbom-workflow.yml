@@ -17,14 +17,13 @@ on:
         default: dev
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
   publish:
     name: Publish workflow to ${{ github.event_name == 'workflow_dispatch' && inputs.environment }} S3
     runs-on: ubuntu-latest
-    # Published prereleases go to dev and normal releases go to prod.
     # A manual run uses the explicitly selected Environment.
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment }}
     env:
@@ -37,6 +36,8 @@ jobs:
     steps:
       - name: Checkout release source
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Generate versioned workflow
         shell: bash
@@ -45,7 +46,7 @@ jobs:
             echo 'release-tag input is required'
             exit 1
           fi
-          if [[ ! "$RELEASE_TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+          if [[ ! "$RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
             echo "Invalid release tag: $RELEASE_TAG"
             exit 1
           fi
@@ -56,6 +57,26 @@ jobs:
             echo 'Version placeholder was not fully replaced'
             exit 1
           fi
+
+      - name: Create and push release tag
+        shell: bash
+        run: |
+          current_commit="$(git rev-parse HEAD)"
+
+          if git rev-parse --verify --quiet "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "refs/tags/$RELEASE_TAG")"
+            if [ "$tagged_commit" != "$current_commit" ]; then
+              echo "Tag $RELEASE_TAG already points to $tagged_commit, not $current_commit"
+              exit 1
+            fi
+            echo "Tag $RELEASE_TAG already exists on the current commit; skipping creation"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"
 
       - name: Display generated workflow
         run: cat sbom-generation.yml

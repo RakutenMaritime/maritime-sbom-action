@@ -24,13 +24,16 @@ permissions:
 
 jobs:
   publish:
+    name: Publish workflow to ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'dev' || 'prod') }} S3
     runs-on: ubuntu-latest
     # Published prereleases go to dev and normal releases go to prod.
     # A manual run uses the explicitly selected Environment.
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'dev' || 'prod') }}
     env:
+      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'dev' || 'prod') }}
       RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release-tag }}
-      S3_NAME: ${{ vars.S3_NAME }}
+      DEV_S3_NAME: ${{ vars.DEV_S3_NAME }}
+      PROD_S3_NAME: ${{ vars.PROD_S3_NAME }}
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2'}}
       S3_KEY: ${{ vars.SBOM_WORKFLOW_S3_KEY || 'sbom-workflow/sbom.yml' }}
     steps:
@@ -55,6 +58,26 @@ jobs:
       - name: Display generated workflow
         run: cat sbom-generation.yml
 
+      - name: Select S3 bucket
+        shell: bash
+        run: |
+          if [ "$DEPLOY_ENV" = "dev" ]; then
+            selected_s3_name="$DEV_S3_NAME"
+          elif [ "$DEPLOY_ENV" = "prod" ]; then
+            selected_s3_name="$PROD_S3_NAME"
+          else
+            echo "Unsupported environment: $DEPLOY_ENV"
+            exit 1
+          fi
+
+          if [ -z "$selected_s3_name" ]; then
+            echo "${DEPLOY_ENV} S3 bucket variable is not configured"
+            exit 1
+          fi
+
+          echo "S3_NAME=$selected_s3_name" >> "$GITHUB_ENV"
+          echo "Selected $DEPLOY_ENV S3 bucket: $selected_s3_name"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -63,6 +86,6 @@ jobs:
 
       - name: Update workflow in S3
         run: |
-          test -n "$S3_NAME" || { echo 'S3_NAME is not configured'; exit 1; }
+          echo "Uploading $DEPLOY_ENV workflow to s3://$S3_NAME/$S3_KEY"
           aws s3 cp sbom-generation.yml "s3://$S3_NAME/$S3_KEY" \
             --content-type application/yaml

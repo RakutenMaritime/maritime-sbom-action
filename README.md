@@ -10,6 +10,40 @@ Action 모음입니다. 두 개의 액션으로 구성됩니다.
 
 ## 🚀 Usage
 
+### 릴리스별 workflow 생성 및 S3 배포
+
+`.github/workflows/publish-sbom-workflow.yml`은 GitHub Release가 발행될 때
+`.github/templates/sbom-generation.yml.tpl`의 `{{version}}`을 release tag로 치환해
+`sbom-generation.yml`을 생성한 후 S3의 고정 key에 업로드합니다. 같은 key에
+업로드하므로 새 release가 발행될 때마다 파일이 최신 태그로 업데이트됩니다.
+
+정식 release는 `prod`, prerelease는 `dev` GitHub Environment를 자동으로 사용합니다.
+수동 실행(`workflow_dispatch`)에서는 release tag와 `dev`/`prod`를 직접 선택할 수
+있습니다. 각 Environment에 다음 값을 등록하세요.
+
+| GitHub Environment | Type | Name | Value 예시 |
+|--------------------|------|------|-----------|
+| `dev` | Variable | `S3_NAME` | dev S3 bucket 이름 |
+| `dev` | Variable | `AWS_REGION` | dev bucket의 AWS region |
+| `dev` | Variable | `SBOM_WORKFLOW_S3_KEY` | 선택 사항. S3 object key |
+| `dev` | Secret | `AWS_ROLE_ARN` | dev IAM role ARN |
+| `prod` | Variable | `S3_NAME` | prod S3 bucket 이름 |
+| `prod` | Variable | `AWS_REGION` | prod bucket의 AWS region |
+| `prod` | Variable | `SBOM_WORKFLOW_S3_KEY` | 선택 사항. S3 object key |
+| `prod` | Secret | `AWS_ROLE_ARN` | prod IAM role ARN |
+
+즉 workflow에서 `dev`를 선택하면 `dev` Environment의 `vars.S3_NAME`과
+`vars.AWS_REGION`이, `prod`를 선택하면 `prod` Environment에 같은 이름으로 등록한
+값이 주입됩니다. 별도의 `DEV_S3_NAME`/`PROD_S3_NAME` 변수는 필요하지 않습니다.
+
+기본 업로드 경로는
+`s3://$S3_NAME/github-actions/sbom-generation.yml`입니다.
+`SBOM_WORKFLOW_S3_KEY`를 등록하면 원하는 key로 변경할 수 있습니다. IAM role에는
+대상 key에 대한 `s3:PutObject` 권한과 GitHub OIDC trust policy가 필요합니다.
+
+GitHub Actions의 `uses:`에는 동적 표현식을 사용할 수 없으므로, 배포 workflow가
+템플릿의 두 `{{version}}` 위치를 실제 release tag(예: `v2.8`)로 치환합니다.
+
 ### 생성 + 전송 (조합)
 
 ```yaml
@@ -212,4 +246,3 @@ upload/tests/run-tests.sh
 ## 📝 라이선스
 
 MIT
-

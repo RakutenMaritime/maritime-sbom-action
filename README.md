@@ -1,63 +1,14 @@
 # Rakuten SBOM Actions
 
-프로젝트의 Software Bill of Materials (SBOM)를 생성하고 API로 전송하는 GitHub
-Action 모음입니다. 두 개의 액션으로 구성됩니다.
+GitHub Actions for generating a project's Software Bill of Materials (SBOM) and
+sending it to an API. This repository provides two actions.
 
-| Action | 경로 | 역할 |
-|--------|------|------|
-| **generate** | `RakutenMaritime/maritime-sbom-action/generate` | `cdxgen`으로 의존성을 스캔해 plain JSON SBOM 생성 |
-| **upload** | `RakutenMaritime/maritime-sbom-action/upload` | 생성된 SBOM 파일을 API로 `POST` 전송 |
+| Action | Path | Purpose |
+|--------|------|---------|
+| **generate** | `RakutenMaritime/maritime-sbom-action/generate` | Scan dependencies with `cdxgen` and produce a plain JSON SBOM |
+| **upload** | `RakutenMaritime/maritime-sbom-action/upload` | Send a generated SBOM file to an API using `POST` |
 
-## 🚀 Usage
-
-### 릴리스별 workflow 생성 및 S3 배포
-
-`.github/workflows/publish-sbom-workflow.yml`을 수동 실행하면
-`.github/templates/sbom-generation.yml.tpl`의 `{{version}}`을 입력한 release tag로
-치환해 `sbom-generation.yml`을 생성한 후 S3의 고정 key에 업로드합니다. 같은 key에
-업로드하므로 workflow를 실행할 때마다 파일이 입력한 태그로 업데이트됩니다.
-
-수동 실행 시 입력한 `release-tag`는 workflow를 실행한 커밋에 annotated Git tag로
-생성되어 원격 저장소에 push됩니다. 동일 태그가 같은 커밋에 이미 존재하면 그대로
-재사용하며, 다른 커밋에 존재하면 workflow가 실패합니다.
-
-수동 실행(`workflow_dispatch`)에서 release tag와 `dev`/`prod`를 직접 선택할 수
-있습니다. 각 Environment에 다음 값을 등록하세요.
-
-Repository의 Actions variables에 `DEV_S3_NAME`과 `PROD_S3_NAME`을 서로 다른
-bucket 이름으로 등록합니다. workflow는 선택된 배포 환경에 따라 둘 중 하나를
-`S3_NAME`으로 설정합니다. 따라서 object key가 같아도 실제 저장 위치는 다음처럼
-서로 다른 bucket으로 분리됩니다.
-
-```text
-dev:  s3://company-sbom-workflows-dev/sbom-workflow/sbom.yml
-prod: s3://company-sbom-workflows-prod/sbom-workflow/sbom.yml
-```
-
-| Scope | Type | Name | Value 예시 |
-|-------|------|------|-----------|
-| Repository | Variable | `DEV_S3_NAME` | dev S3 bucket 이름 |
-| Repository | Variable | `PROD_S3_NAME` | prod S3 bucket 이름 |
-| `dev` | Variable | `AWS_REGION` | dev bucket의 AWS region |
-| `dev` | Variable | `SBOM_WORKFLOW_S3_KEY` | 선택 사항. S3 object key |
-| `dev` | Secret | `AWS_ROLE_ARN` | dev IAM role ARN |
-| `prod` | Variable | `AWS_REGION` | prod bucket의 AWS region |
-| `prod` | Variable | `SBOM_WORKFLOW_S3_KEY` | 선택 사항. S3 object key |
-| `prod` | Secret | `AWS_ROLE_ARN` | prod IAM role ARN |
-
-즉 workflow에서 `dev`를 선택하면 `vars.DEV_S3_NAME`, `prod`를 선택하면
-`vars.PROD_S3_NAME`을 S3 bucket 이름으로 사용합니다. `AWS_REGION`,
-`SBOM_WORKFLOW_S3_KEY`, `AWS_ROLE_ARN`은 선택된 GitHub Environment에서 가져옵니다.
-
-기본 업로드 경로는
-`s3://$S3_NAME/sbom-workflow/sbom.yml`입니다.
-`SBOM_WORKFLOW_S3_KEY`를 등록하면 원하는 key로 변경할 수 있습니다. IAM role에는
-대상 key에 대한 `s3:PutObject` 권한과 GitHub OIDC trust policy가 필요합니다.
-
-GitHub Actions의 `uses:`에는 동적 표현식을 사용할 수 없으므로, 배포 workflow가
-템플릿의 두 `{{version}}` 위치를 실제 release tag(예: `v2.8`)로 치환합니다.
-
-### 생성 + 전송 (조합)
+### Generate and upload
 
 ```yaml
 name: SBOM
@@ -74,9 +25,9 @@ jobs:
         id: sbom
         uses: RakutenMaritime/maritime-sbom-action/generate@main
         with:
-          scan-path: '.'           # 스캔 경로 (default: .)
-          output-file: 'sbom.json' # 출력 파일 경로 (default: sbom.json)
-          recurse: 'true'          # 하위 디렉토리까지 재귀 스캔 (default: true)
+          scan-path: '.'           # Path to scan (default: .)
+          output-file: 'sbom.json' # Output file (default: sbom.json)
+          recurse: 'true'          # Recursively scan subdirectories
 
       - name: Display SBOM
         run: cat ${{ steps.sbom.outputs.sbom-file }}
@@ -86,24 +37,14 @@ jobs:
         with:
           sbom-file: ${{ steps.sbom.outputs.sbom-file }}
           api-url: 'https://dev-ur-e27.rakuten-maritime.com/api/v1/sbom'
-          api-key: ${{ secrets.SBOM_API_KEY }}   # X-Api-Key 헤더로 전송
+          api-key: ${{ secrets.SBOM_API_KEY }}   # Sent in the X-Api-Key header
 ```
 
-### 생성만
-
-```yaml
-- uses: RakutenMaritime/maritime-sbom-action/generate@main
-  id: sbom
-- uses: actions/upload-artifact@v4
-  with:
-    name: sbom
-    path: ${{ steps.sbom.outputs.sbom-file }}
-```
 
 ## 🧩 generate action
 
-`cdxgen`으로 의존성을 스캔한 뒤, 아래와 같은 **간결한 JSON 목록(plain)**으로
-출력합니다.
+Scans dependencies with `cdxgen` and produces a compact, plain JSON document like
+the following.
 
 ```json
 {
@@ -154,108 +95,79 @@ jobs:
 }
 ```
 
-각 컴포넌트는 **구성요소**(`name`/`type`), **버전**(`version`), **라이선스**
-(`licenses`, SPDX id/name/expression 배열), **무결성 해시**(`hashes`, CycloneDX
-`{ alg, content }` 배열 — 예: lockfile integrity에서 유도한 SHA-512), **공급자**
-(`supplier`), 그리고 **직접 의존성**(`dependsOn`, 이 컴포넌트가 직접 의존하는 다른
-컴포넌트의 `ref` 목록)을 포함합니다. `ref`는 `dependsOn`이 가리키는 식별자(주로
-purl)입니다. 값이 없으면 `null`(목록은 `[]`)로 유지됩니다.
+Each component includes its identity (`name` and `type`), `version`, `licenses`
+(an array of SPDX IDs, names, or expressions), integrity `hashes` (CycloneDX
+`{ alg, content }` objects, such as SHA-512 values derived from a lockfile),
+`supplier`, and direct dependencies. `dependsOn` contains the `ref` values of the
+components on which the component directly depends. A `ref` is normally a purl.
+Missing scalar values remain `null`, while missing lists remain `[]`.
 
-> 스캔은 `.github/workflows`도 훑기 때문에 cdxgen이 CI가 쓰는 **GitHub Actions**
-> (`actions/checkout` 등, `pkg:github/…` purl)를 컴포넌트로 보고합니다. 이는 빌드
-> 환경이지 프로젝트의 의존성이 아니므로, 컴포넌트 목록과 의존성 그래프
-> (`dependsOn`/`directDependencies`) 양쪽에서 **제외**됩니다.
+> Because the scan also examines `.github/workflows`, `cdxgen` may identify CI
+> GitHub Actions such as `actions/checkout` as `pkg:github/...` components. These
+> are part of the build environment rather than project dependencies, so they
+> are removed from both the component list and the dependency graph
+> (`dependsOn` and `directDependencies`).
 
-**전이(transitive) 의존성**은 각 컴포넌트의 `dependsOn`을 따라가며 만들어지는
-전이 폐포(transitive closure)로 표현됩니다. 예: `directDependencies`의 `a`에서
-`a.dependsOn = [b]`를 따라가면 프로젝트의 전체 의존성 `{a, b}`가 됩니다.
-`metadata.rootRef`는 스캔 대상 프로젝트 자신을, `metadata.directDependencies`는
-프로젝트가 **직접** 의존하는(최상위) 컴포넌트의 `ref` 목록을 가리킵니다.
+Transitive dependencies are represented by following each component's
+`dependsOn` edges. For example, if direct dependency `a` has
+`a.dependsOn = [b]`, the complete dependency set is `{a, b}`.
+`metadata.rootRef` identifies the scanned project, while
+`metadata.directDependencies` lists the top-level components on which the
+project directly depends.
 
-`metadata`는 **이 액션을 실행하는 (분석 대상) 저장소**의 정보입니다. 액션 자신의
-저장소가 아니라, 워크플로우가 돌아가는 소비자 repo의 `GITHUB_REPOSITORY`/`GITHUB_SHA`
-등을 사용하며 (없으면 scan 경로의 git으로 폴백), 이 정보는 SBOM에 포함되어 **upload
-시 API로 함께 전송**됩니다. `parentCommit`(직전 부모 커밋)과 `tags`(현재 커밋에
-달린 태그)도 포함됩니다. 값이 없는 메타 필드는 출력에서 생략됩니다.
+`metadata` describes the consumer repository being analyzed, not this action's
+repository. It uses values such as `GITHUB_REPOSITORY` and `GITHUB_SHA`, falling
+back to Git data from the scan path when necessary. This metadata is included in
+the SBOM and sent to the API during upload. It can also include `parentCommit`
+and tags attached to the current commit. Empty metadata fields are omitted.
 
-> `parentCommit`은 git 히스토리가 있어야 채워집니다. GitHub Actions 기본
-> `actions/checkout`은 `fetch-depth: 1`(HEAD만)이므로, 부모 커밋 정보가 필요하면
-> 소비자 워크플로우에서 `fetch-depth: 0`으로 체크아웃하세요.
+> `parentCommit` requires Git history. The default `actions/checkout` depth is
+> one commit, so use `fetch-depth: 0` in the consumer workflow when parent commit
+> information is required.
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `scan-path` | 스캔할 경로 | `.` |
-| `output-file` | 출력 파일 경로 | `sbom.json` |
-| `recurse` | 하위 디렉토리(모노레포)까지 재귀 스캔. `false`면 최상위만 스캔 | `true` |
+| `scan-path` | Path to scan | `.` |
+| `output-file` | SBOM output path | `sbom.json` |
+| `recurse` | Recursively scan subdirectories for monorepos; `false` scans only the top level | `false` |
 
 | Output | Description |
 |--------|-------------|
-| `sbom-file` | 생성된 SBOM 파일 경로 |
+| `sbom-file` | Path to the generated SBOM file |
 
-생성 결과는 로그에 목록으로 출력되며, GitHub Actions의 **Job Summary**에 컴포넌트
-표로도 표시됩니다.
+The generated components are printed to the log and shown as a table in the
+GitHub Actions job summary.
 
 ## 📡 upload action
 
-`api-url`로 SBOM 파일을 `Content-Type: application/json`, `POST`로 전송합니다.
-`api-key`가 있으면 `X-Api-Key` 헤더로 전송하며, 응답이 2xx가 아니면 실패합니다.
-`api-url`이 비어 있으면 업로드를 건너뜁니다.
+Sends the SBOM file to `api-url` using `POST` with
+`Content-Type: application/json`. When `api-key` is set, it is sent in the
+`X-Api-Key` header. A non-2xx response fails the action. An empty `api-url`
+skips the upload.
 
-`signing-secret`을 지정하면 전송 본문을 HMAC-SHA256으로 서명해
-`X-Signature-256: sha256=<hex>` 헤더로 함께 보냅니다 (GitHub 웹훅과 동일한 방식).
-서버는 동일한 시크릿으로 수신 본문의 HMAC을 다시 계산해 일치 여부로 페이로드
-위변조를 검증할 수 있습니다.
+When `signing-secret` is set, the request body is signed with HMAC-SHA256 and
+the signature is sent as `X-Signature-256: sha256=<hex>`, following the GitHub
+webhook convention. The server can recompute the HMAC with the shared secret to
+detect payload modification or forgery.
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `sbom-file` | 업로드할 SBOM 파일 경로 | `sbom.json` |
-| `api-url` | POST 대상 URL. 비어 있으면 업로드 스킵 | `''` |
-| `api-key` | `X-Api-Key` 헤더로 전송할 API 키 | `''` |
-| `signing-secret` | HMAC-SHA256 페이로드 서명용 공유 시크릿. 지정 시 `X-Signature-256` 헤더로 전송 | `''` |
+| `sbom-file` | SBOM file to upload | `sbom.json` |
+| `api-url` | POST destination; an empty value skips the upload | `''` |
+| `api-key` | API key sent in the `X-Api-Key` header | `''` |
+| `signing-secret` | Shared secret for HMAC-SHA256 payload signing; sends `X-Signature-256` when set | `''` |
 
-서버 측 검증 예시 (Node.js):
 
-```js
-const crypto = require('crypto');
-
-// rawBody: 수신한 원본 요청 바디(Buffer/string), 서명 검증은 파싱 전에 수행
-const expected = 'sha256=' +
-  crypto.createHmac('sha256', SIGNING_SECRET).update(rawBody).digest('hex');
-const got = req.headers['x-signature-256'] || '';
-const ok = got.length === expected.length &&
-  crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected));
-if (!ok) return res.status(401).send('invalid signature');
-```
-
-## 🏗️ 프로젝트 구조
-
-```
-.
-├── generate/                    # SBOM 생성 액션 (Docker)
-│   ├── action.yml
-│   ├── Dockerfile               # node + cdxgen + jq
-│   ├── generate-sbom            # 엔트리포인트
-│   ├── scripts/
-│   │   └── sbom-generator.sh    # cdxgen → plain JSON
-│   └── tests/
-│       └── run-tests.sh
-└── upload/                      # SBOM 전송 액션 (composite)
-    ├── action.yml
-    ├── upload.sh                # curl POST
-    └── tests/
-        └── run-tests.sh
-```
-
-## 🔧 개발 방법
+## 🔧 Development
 
 ```bash
-# 생성 액션 테스트 (Docker 이미지 빌드 후 실행)
+# Test the generate action (builds and runs its Docker image)
 generate/tests/run-tests.sh
 
-# 전송 액션 테스트 (호스트에서 upload.sh 직접 구동)
+# Test the upload action on the host
 upload/tests/run-tests.sh
 ```
 
-## 📝 라이선스
+## 📝 License
 
 MIT
